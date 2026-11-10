@@ -1,0 +1,24 @@
+{
+  "project": {
+    "type": "cli"
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "README.md", "requirements/**/*.md", "requirements/**/*.txt"],
+    "api": [],
+    "code": ["src/**/*.py", "cmd/**/*.go", "src/**/*.rs", "src/**/*.ts"],
+    "tests": ["tests/**/*.py", "tests/**/*.go", "tests/**/*.rs"]
+  },
+  "commands": {
+    "unit": "pytest -q",
+    "cli-smoke": "python -m your_cli --help",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json"
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.6,
+    "line_coverage_delta_min": 0.0,
+    "mutation_score_min": 0.5,
+    "flaky_rate_max": 0.01
+  }
+}

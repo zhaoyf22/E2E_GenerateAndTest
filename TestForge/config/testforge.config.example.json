@@ -1,0 +1,134 @@
+{
+  "project": {
+    "name": "example-platform",
+    "type": "platform",
+    "root": "."
+  },
+  "inputs": {
+    "docs": [
+      "docs/**/*.md",
+      "requirements/**/*.md",
+      "requirements/**/*.txt",
+      "requirements/**/*.pdf",
+      "requirements/**/*.docx",
+      "requirements/**/*.pptx",
+      "requirements/**/*.xlsx",
+      "PRD.md",
+      "REQUIREMENTS.md",
+      "requirements.md"
+    ],
+    "api": [
+      "openapi.yaml",
+      "openapi.yml",
+      "openapi.json",
+      "openapi/**/*.yaml",
+      "openapi/**/*.yml",
+      "openapi/**/*.json",
+      "api/**/*.yaml"
+    ],
+    "code": [
+      "backend/src/**/*.py",
+      "frontend/src/**/*.ts",
+      "frontend/src/**/*.tsx"
+    ],
+    "tests": [
+      "backend/tests/**/*.py",
+      "e2e/**/*.ts",
+      "frontend/src/**/*.test.ts"
+    ],
+    "ignore": [
+      "**/node_modules/**",
+      "**/.venv/**",
+      "**/venv/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.git/**",
+      "**/__pycache__/**",
+      "**/.testforge/**",
+      "**/*.min.js",
+      "**/*.lock"
+    ]
+  },
+  "stack": {
+    "backend": {
+      "language": "python",
+      "framework": "fastapi",
+      "test_framework": "pytest",
+      "database": "postgresql"
+    },
+    "frontend": {
+      "language": "typescript",
+      "framework": "react",
+      "test_framework": "playwright"
+    },
+    "api": {
+      "spec": "openapi/openapi.yaml",
+      "base_url": "http://localhost:8000"
+    }
+  },
+  "commands": {
+    "unit": "pytest -q",
+    "api": "pytest tests/api -q",
+    "e2e": "npx playwright test",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json",
+    "mutation": "mutmut run",
+    "lint": "ruff check ."
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.6,
+    "line_coverage_delta_min": 0.0,
+    "mutation_score_min": 0.6,
+    "flaky_rate_max": 0.02,
+    "cases_min": 1
+  },
+  "generation": {
+    "language": "zh-CN",
+    "max_cases_per_ac": 12,
+    "max_context_chars_per_entry": 12000,
+    "techniques": [
+      "EP",
+      "BVA",
+      "DT",
+      "ST",
+      "scenario",
+      "error-guessing",
+      "permission",
+      "idempotency",
+      "concurrency"
+    ],
+    "default_priority": "P1"
+  },
+  "adapters": {
+    "docling": {
+      "enabled": false
+    },
+    "schemathesis": {
+      "enabled": false
+    },
+    "playwright": {
+      "enabled": true
+    },
+    "pytest": {
+      "enabled": true
+    },
+    "mutation": {
+      "tool": "mutmut",
+      "enabled": false
+    },
+    "tcms": {
+      "tool": "kiwi",
+      "enabled": false
+    }
+  },
+  "paths": {
+    "context": ".testforge/context",
+    "cases": ".testforge/cases",
+    "runs": ".testforge/runs",
+    "reports": ".testforge/reports",
+    "coverage_report": "coverage.json",
+    "mutation_report": "",
+    "validation_report": ".testforge/reports/validation-report.json"
+  }
+}

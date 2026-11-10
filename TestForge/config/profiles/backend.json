@@ -1,0 +1,25 @@
+{
+  "project": {
+    "type": "backend"
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "PRD.md", "REQUIREMENTS.md", "requirements.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml", "openapi/**/*.yml", "openapi/**/*.json"],
+    "code": ["src/**/*.py", "src/**/*.go", "src/**/*.java", "src/**/*.rs"],
+    "tests": ["tests/**/*.py", "tests/**/*.go"]
+  },
+  "commands": {
+    "unit": "pytest -q",
+    "api": "pytest tests/api -q",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json",
+    "mutation": "mutmut run"
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.65,
+    "line_coverage_delta_min": 0.0,
+    "mutation_score_min": 0.6,
+    "flaky_rate_max": 0.02
+  }
+}

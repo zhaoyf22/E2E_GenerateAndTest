@@ -1,0 +1,47 @@
+# TestForge runtime artifacts
+.testforge/context/
+.testforge/runs/
+.testforge/reports/*.json
+.testforge/reports/*.md
+.testforge/*.db
+
+# Keep cases (review assets) and config
+!.testforge/cases/
+!.testforge/reports/.gitkeep
+
+# Example-generated artifacts
+examples/**/runs/
+examples/**/validation-report.json
+examples/**/testable-items-validation.json
+examples/**/coverage-matrix.*
+examples/**/test-cases.md
+examples/**/e2e.feature
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.json
+coverage.xml
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+playwright-report/
+test-results/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

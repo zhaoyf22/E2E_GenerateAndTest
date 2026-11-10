@@ -1,0 +1,45 @@
+{
+  "project": {
+    "name": "example-platform",
+    "type": "platform",
+    "root": "."
+  },
+  "inputs": {
+    "docs": ["requirements/**/*.md"],
+    "api": ["openapi.yaml"],
+    "code": ["backend/src/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx"],
+    "tests": ["backend/tests/**/*.py", "e2e/**/*.ts"],
+    "ignore": ["**/node_modules/**", "**/.venv/**", "**/dist/**", "**/.testforge/**"]
+  },
+  "stack": {
+    "backend": { "language": "python", "framework": "fastapi", "test_framework": "pytest" },
+    "frontend": { "language": "typescript", "framework": "react", "test_framework": "playwright" },
+    "api": { "spec": "openapi.yaml", "base_url": "http://localhost:8000" }
+  },
+  "commands": {
+    "unit": "pytest -q",
+    "api": "pytest tests/api -q",
+    "e2e": "npx playwright test",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json"
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.6,
+    "mutation_score_min": 0.6,
+    "flaky_rate_max": 0.02
+  },
+  "generation": {
+    "language": "zh-CN",
+    "max_cases_per_ac": 12,
+    "techniques": ["EP", "BVA", "DT", "ST", "scenario", "error-guessing", "permission", "idempotency", "concurrency"]
+  },
+  "paths": {
+    "context": ".testforge/context",
+    "cases": ".testforge/cases",
+    "runs": ".testforge/runs",
+    "reports": ".testforge/reports",
+    "coverage_report": "coverage.json",
+    "validation_report": ".testforge/reports/validation-report.json"
+  }
+}

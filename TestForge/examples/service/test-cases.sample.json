@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "project": "example-service",
+    "generated_at": "2026-11-10T00:00:00+00:00",
+    "assumptions": ["测试环境提供 /test/seed 与 /test/cleanup"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-SHORTEN-001",
+      "title": "合法 URL 创建短链返回 201 和短链地址",
+      "ac_ids": ["AC-001"],
+      "ti_ids": ["TI-001-CREATE-OK"],
+      "source_refs": ["DOC-0001", "openapi.yaml#/paths/~1shorten/post"],
+      "technique": "scenario",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": ["服务可用", "幂等键为 key-create-001"],
+      "steps": [
+        {"action": "POST /shorten", "data": "{\"url\":\"https://example.com/path\"}", "expected": "返回 201"},
+        {"action": "检查响应体", "expected": "code 为 4-12 位字母数字，short_url 以 https://s.example/ 开头"}
+      ],
+      "test_data": {"url": "https://example.com/path", "idempotency_key": "key-create-001"},
+      "expected_result": "201，返回 code 和 short_url，数据库存在对应记录",
+      "postconditions": ["删除测试短链"],
+      "automatable": true,
+      "notes": ""
+    },
+    {
+      "id": "TC-SHORTEN-002",
+      "title": "URL 长度为 2049 时返回 400 INVALID_URL",
+      "ac_ids": ["AC-002"],
+      "ti_ids": ["TI-002-URL-LEN"],
+      "source_refs": ["DOC-0001", "requirements/service.md#api"],
+      "technique": "BVA",
+      "priority": "P1",
+      "type": "boundary",
+      "preconditions": ["服务可用"],
+      "steps": [
+        {"action": "POST /shorten，url 长度为 2049", "data": "https://example.com/<2031 个 a>", "expected": "返回 400，error_code=INVALID_URL"},
+        {"action": "查询是否创建短链", "expected": "没有新记录"}
+      ],
+      "test_data": {"url_length": 2049},
+      "expected_result": "400 INVALID_URL，不创建短链",
+      "postconditions": [],
+      "automatable": true,
+      "notes": "另需覆盖 2048 边界成功"
+    },
+    {
+      "id": "TC-SHORTEN-003",
+      "title": "重复 custom_code 返回 409 CODE_TAKEN 且不覆盖",
+      "ac_ids": ["AC-003"],
+      "ti_ids": ["TI-003-CODE-CONFLICT"],
+      "source_refs": ["DOC-0001", "openapi.yaml#/paths/~1shorten/post"],
+      "technique": "EP",
+      "priority": "P0",
+      "type": "negative",
+      "preconditions": ["已存在 code=abc123 指向 https://example.com/old"],
+      "steps": [
+        {"action": "POST /shorten 使用 custom_code=abc123", "data": "{\"url\":\"https://example.com/new\",\"custom_code\":\"abc123\"}", "expected": "返回 409，error_code=CODE_TAKEN"},
+        {"action": "GET /abc123", "expected": "仍 302 到 https://example.com/old"}
+      ],
+      "test_data": {"custom_code": "abc123", "old_url": "https://example.com/old", "new_url": "https://example.com/new"},
+      "expected_result": "409 CODE_TAKEN，原短链不变",
+      "postconditions": ["清理测试数据"],
+      "automatable": true,
+      "notes": ""
+    },
+    {
+      "id": "TC-REDIRECT-004",
+      "title": "过期短链返回 410 GONE",
+      "ac_ids": ["AC-004"],
+      "ti_ids": ["TI-004-EXPIRED"],
+      "source_refs": ["DOC-0002", "requirements/service.md#重定向"],
+      "technique": "ST",
+      "priority": "P1",
+      "type": "state",
+      "preconditions": ["存在 code=expired1，expires_at 已过"],
+      "steps": [
+        {"action": "GET /expired1", "expected": "返回 410，error_code=GONE"},
+        {"action": "查询点击事件", "expected": "不记录有效点击或记录 expired 事件（按设计）"}
+      ],
+      "test_data": {"code": "expired1"},
+      "expected_result": "410 GONE，不重定向",
+      "postconditions": ["清理测试数据"],
+      "automatable": true,
+      "notes": "需确认过期后是否仍记录点击"
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-SHORTEN-001"],
+    "AC-002": ["TC-SHORTEN-002"],
+    "AC-003": ["TC-SHORTEN-003"],
+    "AC-004": ["TC-REDIRECT-004"]
+  },
+  "gap_list": [
+    {"gap_id": "GAP-001", "description": "AC-005 删除权限用例未包含", "impact": "权限覆盖不足", "owner": "QA"}
+  ],
+  "self_check": {
+    "missing": ["AC-005"],
+    "duplicates": [],
+    "unexecutable": [],
+    "unsupported_expectations": []
+  }
+}

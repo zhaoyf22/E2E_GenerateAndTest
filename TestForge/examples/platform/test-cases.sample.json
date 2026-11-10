@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "project": "example-platform",
+    "generated_at": "2026-11-10T00:00:00+00:00",
+    "source_context": "examples/platform/context.md",
+    "assumptions": [
+      "测试环境提供 /test/seed 接口用于创建用户/商品",
+      "密码 Abc12345 满足 8-20 位且包含字母和数字"
+    ]
+  },
+  "test_cases": [
+    {
+      "id": "TC-LOGIN-001",
+      "title": "已注册用户使用正确密码登录后进入工作台",
+      "ac_ids": ["AC-001"],
+      "ti_ids": ["TI-001-LOGIN-OK"],
+      "source_refs": ["DOC-0001", "requirements/PRD.md#31-登录"],
+      "technique": "scenario",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": [
+        "用户 test+001@example.com 已注册且邮箱已验证",
+        "密码为 Abc12345"
+      ],
+      "steps": [
+        {"action": "打开登录页，输入邮箱", "data": "test+001@example.com", "expected": "邮箱输入框接受输入"},
+        {"action": "输入密码并点击登录", "data": "Abc12345", "expected": "返回 200，返回 token"},
+        {"action": "观察页面跳转", "expected": "跳转到 /dashboard，显示当前用户邮箱"}
+      ],
+      "test_data": {"email": "test+001@example.com", "password": "Abc12345"},
+      "expected_result": "登录成功，跳转 /dashboard，页面显示 test+001@example.com",
+      "postconditions": [],
+      "automatable": true,
+      "notes": "P0 主流程"
+    },
+    {
+      "id": "TC-LOGIN-004",
+      "title": "密码长度为 7 位时拒绝登录",
+      "ac_ids": ["AC-001"],
+      "ti_ids": ["TI-001-PWD-LEN"],
+      "source_refs": ["DOC-0001", "requirements/PRD.md#31-登录"],
+      "technique": "BVA",
+      "priority": "P1",
+      "type": "boundary",
+      "preconditions": [
+        "用户 test+001@example.com 已注册且邮箱已验证"
+      ],
+      "steps": [
+        {"action": "打开登录页，输入邮箱", "data": "test+001@example.com", "expected": "邮箱输入框接受输入"},
+        {"action": "输入 7 位密码并点击登录", "data": "Abc1234", "expected": "前端提示密码长度应为 8-20 位，不发送登录请求"}
+      ],
+      "test_data": {"email": "test+001@example.com", "password": "Abc1234"},
+      "expected_result": "登录失败，提示密码长度不合法，账号未被锁定",
+      "postconditions": [],
+      "automatable": true,
+      "notes": "边界值下界 min-1；另需覆盖 min=8、max=20、max+1=21"
+    },
+    {
+      "id": "TC-ORDER-012",
+      "title": "库存不足时提交订单被拒绝且不扣减库存",
+      "ac_ids": ["AC-002"],
+      "ti_ids": ["TI-002-STOCK"],
+      "source_refs": ["DOC-0002", "openapi.yaml#/paths/~1orders/post"],
+      "technique": "EP",
+      "priority": "P0",
+      "type": "negative",
+      "preconditions": [
+        "商品 SKU-001 库存为 1",
+        "用户 buyer+001@example.com 已登录"
+      ],
+      "steps": [
+        {"action": "调用 POST /orders 提交 2 件", "data": "{\"sku\":\"SKU-001\",\"qty\":2}", "expected": "返回 409，错误码 STOCK_INSUFFICIENT"},
+        {"action": "查询 GET /products/SKU-001", "data": "SKU-001", "expected": "库存仍为 1"},
+        {"action": "查询用户订单列表", "data": "buyer+001@example.com", "expected": "没有新订单"}
+      ],
+      "test_data": {"sku": "SKU-001", "qty": 2, "stock": 1},
+      "expected_result": "订单创建失败，返回 409/STOCK_INSUFFICIENT，库存不变，无订单记录",
+      "postconditions": [],
+      "automatable": true,
+      "notes": "另需覆盖并发扣减最后 1 件"
+    },
+    {
+      "id": "TC-ORDER-020",
+      "title": "相同 Idempotency-Key 重复提交只创建一个订单",
+      "ac_ids": ["AC-003"],
+      "ti_ids": ["TI-003-IDEMPOTENCY"],
+      "source_refs": ["DOC-0003", "openapi.yaml#/paths/~1orders/post"],
+      "technique": "idempotency",
+      "priority": "P0",
+      "type": "integration",
+      "preconditions": [
+        "商品 SKU-001 库存为 10",
+        "用户 buyer+001@example.com 已登录",
+        "Idempotency-Key 为 key-001"
+      ],
+      "steps": [
+        {"action": "第一次 POST /orders", "data": "key-001 + {sku:SKU-001,qty:1}", "expected": "返回 201，order_id=O1"},
+        {"action": "第二次 POST /orders", "data": "key-001 + 相同 body", "expected": "返回 200，order_id=O1"},
+        {"action": "查询库存", "data": "SKU-001", "expected": "库存为 9，只扣减一次"}
+      ],
+      "test_data": {"sku": "SKU-001", "qty": 1, "idempotency_key": "key-001"},
+      "expected_result": "两次响应 order_id 相同，库存只扣减 1 次，只产生 1 个订单",
+      "postconditions": ["取消/删除测试订单"],
+      "automatable": true,
+      "notes": "P0 幂等"
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-LOGIN-001", "TC-LOGIN-004"],
+    "AC-002": ["TC-ORDER-012"],
+    "AC-003": ["TC-ORDER-020"]
+  },
+  "gap_list": [
+    {
+      "gap_id": "GAP-001",
+      "description": "锁定 30 分钟后是否自动解锁，还是需要管理员操作？",
+      "impact": "影响 TC-LOGIN 锁定相关用例的预期",
+      "owner": "产品经理"
+    }
+  ],
+  "self_check": {
+    "missing": ["AC-004 权限用例示例未包含"],
+    "duplicates": [],
+    "unexecutable": [],
+    "unsupported_expectations": []
+  }
+}

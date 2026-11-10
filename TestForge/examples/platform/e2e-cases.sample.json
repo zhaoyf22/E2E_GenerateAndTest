@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "project": "example-platform",
+    "generated_at": "2026-11-10T00:00:00+00:00",
+    "base_url": "http://localhost:3000",
+    "assumptions": [
+      "测试环境提供 /test/seed 与 /test/cleanup",
+      "登录页字段 label 为“邮箱/密码”"
+    ]
+  },
+  "e2e_cases": [
+    {
+      "id": "E2E-ORDER-001",
+      "title": "已登录用户购买单件商品并支付成功",
+      "ac_ids": ["AC-002"],
+      "source_refs": ["DOC-0002", "requirements/PRD.md#32-下单"],
+      "feature": "下单与支付",
+      "priority": "P0",
+      "persona": "已注册买家",
+      "preconditions": [
+        "用户 buyer+001@example.com 已登录",
+        "商品 SKU-001 库存为 10，单价 99.00"
+      ],
+      "steps": [
+        {"action": "打开商品详情页", "locator_hint": "getByRole('link', {name: '商品 SKU-001'})", "expected": "显示商品与价格"},
+        {"action": "加入购物车", "locator_hint": "getByRole('button', {name: '加入购物车'})", "expected": "购物车数量为 1"},
+        {"action": "进入结算页，选择在线支付，提交订单", "locator_hint": "getByLabel('在线支付')", "expected": "跳转 /orders/{orderId}，状态“待支付”"},
+        {"action": "完成支付", "locator_hint": "getByRole('button', {name: '立即支付'})", "expected": "状态“已支付”，库存变为 9"}
+      ],
+      "expected_result": "订单状态从待支付变为已支付，库存从 10 变为 9",
+      "test_data": {"email": "buyer+001@example.com", "sku": "SKU-001", "qty": 1},
+      "api_setup": [
+        {"method": "POST", "path": "/test/seed", "body": {"email": "buyer+001@example.com", "sku": "SKU-001", "stock": 10}, "expected_status": 200}
+      ],
+      "cleanup": ["POST /test/cleanup {email}"],
+      "automatable": true,
+      "tags": ["smoke", "order"],
+      "notes": "P0 主流程"
+    },
+    {
+      "id": "E2E-ORDER-002",
+      "title": "库存不足时提交订单被拒绝",
+      "ac_ids": ["AC-002"],
+      "source_refs": ["DOC-0002", "requirements/PRD.md#32-下单"],
+      "feature": "下单与支付",
+      "priority": "P0",
+      "persona": "已注册买家",
+      "preconditions": [
+        "用户 buyer+001@example.com 已登录",
+        "商品 SKU-001 库存为 1"
+      ],
+      "steps": [
+        {"action": "在购物车将 SKU-001 数量改为 2", "locator_hint": "getByTestId('qty-SKU-001')", "expected": "数量显示 2"},
+        {"action": "提交订单", "locator_hint": "getByRole('button', {name: '提交订单'})", "expected": "提示“库存不足”，不跳转"},
+        {"action": "刷新商品详情", "expected": "库存仍为 1，订单列表无新订单"}
+      ],
+      "expected_result": "提交失败，提示库存不足，库存不变，无订单记录",
+      "test_data": {"email": "buyer+001@example.com", "sku": "SKU-001", "qty": 2, "stock": 1},
+      "api_setup": [
+        {"method": "POST", "path": "/test/seed", "body": {"email": "buyer+001@example.com", "sku": "SKU-001", "stock": 1}, "expected_status": 200}
+      ],
+      "cleanup": ["POST /test/cleanup {email}"],
+      "automatable": true,
+      "tags": ["order", "negative"],
+      "notes": "P0 负例"
+    }
+  ],
+  "journeys": [
+    {
+      "journey_id": "J-ORDER-001",
+      "name": "买家下单并支付",
+      "persona": "已注册买家",
+      "case_ids": ["E2E-ORDER-001", "E2E-ORDER-002"],
+      "source_refs": ["requirements/PRD.md#32-下单"]
+    }
+  ],
+  "gap_list": []
+}

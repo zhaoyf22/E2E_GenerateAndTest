@@ -1,0 +1,8 @@
+{
+  "requirements": [
+    { "ac_id": "AC-001", "text": "登录：已注册且邮箱已验证的用户，正确密码登录进入 /dashboard；密码错误提示统一文案；连续失败 5 次锁定 30 分钟。" },
+    { "ac_id": "AC-002", "text": "下单：库存充足返回 201、状态 pending_payment、扣减库存；库存不足返回 409/STOCK_INSUFFICIENT，库存不变，不创建订单。" },
+    { "ac_id": "AC-003", "text": "幂等：相同 Idempotency-Key 重复提交只创建一个订单，第二次返回 200 且 order_id 相同。" },
+    { "ac_id": "AC-004", "text": "权限：普通用户访问他人订单返回 403；管理员访问任意订单返回 200。" }
+  ]
+}

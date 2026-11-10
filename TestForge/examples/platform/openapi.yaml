@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Example Shop API
+  version: 1.0.0
+paths:
+  /login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, maxLength: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+        "401":
+          description: Invalid credentials
+  /orders:
+    post:
+      summary: Create order
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, qty]
+              properties:
+                sku: { type: string }
+                qty: { type: integer, minimum: 1 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          description: Unauthorized
+        "409":
+          description: Stock insufficient
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error_code: { type: string, example: STOCK_INSUFFICIENT }
+  /orders/{orderId}:
+    get:
+      summary: Get order
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+  /products/{sku}:
+    get:
+      summary: Get product
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sku: { type: string }
+                  stock: { type: integer }
+                  price: { type: number }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Order:
+      type: object
+      properties:
+        order_id: { type: string }
+        sku: { type: string }
+        qty: { type: integer }
+        status: { type: string, enum: [pending_payment, paid, cancelled] }
+        total: { type: number }

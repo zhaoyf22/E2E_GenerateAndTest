@@ -1,0 +1,25 @@
+{
+  "project": {
+    "type": "platform"
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "requirements/**/*.pdf", "requirements/**/*.docx", "requirements/**/*.pptx", "requirements/**/*.xlsx", "PRD.md", "REQUIREMENTS.md", "requirements.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml", "openapi/**/*.yml", "openapi/**/*.json"],
+    "code": ["backend/src/**/*.py", "frontend/src/**/*.ts", "frontend/src/**/*.tsx"],
+    "tests": ["backend/tests/**/*.py", "e2e/**/*.ts", "frontend/src/**/*.test.ts"]
+  },
+  "commands": {
+    "unit": "pytest -q",
+    "api": "pytest tests/api -q",
+    "e2e": "npx playwright test",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json"
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.6,
+    "line_coverage_delta_min": 0.0,
+    "mutation_score_min": 0.6,
+    "flaky_rate_max": 0.02
+  }
+}

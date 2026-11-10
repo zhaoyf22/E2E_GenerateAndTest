@@ -1,0 +1,52 @@
+stages:
+  - test
+
+testforge:
+  stage: test
+  image: python:3.11
+  timeout: 45m
+  before_script:
+    - python -m pip install --upgrade pip
+    - if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - if [ -f pyproject.toml ]; then pip install -e .; fi
+  script:
+    - python testforge/testforge.py doctor
+    - python testforge/testforge.py pack
+    - |
+      if [ -f .testforge/cases/test-cases.json ]; then
+        python testforge/testforge.py validate \
+          --cases .testforge/cases/test-cases.json \
+          --requirements .testforge/cases/testable-items.json \
+          --out .testforge/reports/validation-report.json
+      fi
+    - |
+      if [ -d tests ]; then
+        pytest -q --cov=src --cov-report=json:coverage.json || true
+      fi
+    - |
+      if [ -f .testforge/run-manifest.json ]; then
+        python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+      fi
+    - |
+      if [ -f .testforge/runs/run-results.json ]; then
+        python testforge/testforge.py gate \
+          --results .testforge/runs/run-results.json \
+          --coverage coverage.json \
+          --validation .testforge/reports/validation-report.json \
+          --out .testforge/reports/gate-report.json
+      else
+        echo "No run results; skipping gate"
+      fi
+    - |
+      python testforge/testforge.py report \
+        --results .testforge/runs/run-results.json \
+        --validation .testforge/reports/validation-report.json \
+        --gate .testforge/reports/gate-report.json \
+        --out .testforge/reports/report.md || true
+  artifacts:
+    when: always
+    paths:
+      - .testforge/reports/
+      - .testforge/runs/
+      - coverage.json
+    expire_in: 1 week

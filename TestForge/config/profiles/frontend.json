@@ -1,0 +1,24 @@
+{
+  "project": {
+    "type": "frontend"
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "PRD.md", "REQUIREMENTS.md", "requirements.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml", "openapi/**/*.yml", "openapi/**/*.json"],
+    "code": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx", "src/**/*.vue"],
+    "tests": ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e/**/*.ts"]
+  },
+  "commands": {
+    "unit": "npx vitest run",
+    "e2e": "npx playwright test",
+    "coverage": "npx vitest run --coverage"
+  },
+  "quality_gates": {
+    "ac_coverage_min": 0.9,
+    "duplicate_similarity_max": 0.85,
+    "line_coverage_min": 0.6,
+    "line_coverage_delta_min": 0.0,
+    "mutation_score_min": 0.5,
+    "flaky_rate_max": 0.02
+  }
+}

@@ -1,0 +1,104 @@
+name: testforge
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Doctor
+        run: python testforge/testforge.py doctor
+
+      - name: Pack context
+        run: python testforge/testforge.py pack
+
+      - name: Validate cases (if present)
+        run: |
+          if [ -f .testforge/cases/test-cases.json ]; then
+            python testforge/testforge.py validate \
+              --cases .testforge/cases/test-cases.json \
+              --requirements .testforge/cases/testable-items.json \
+              --out .testforge/reports/validation-report.json
+          else
+            echo "No test-cases.json; skipping validation"
+          fi
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then pip install -e ".[test]" || pip install -e .; fi
+
+      - name: Unit / API tests
+        run: |
+          if [ -f pytest.ini ] || [ -f pyproject.toml ] || [ -d tests ]; then
+            pytest -q --cov=src --cov-report=json:coverage.json || true
+          fi
+
+      - name: Install Node deps
+        run: |
+          if [ -f package.json ]; then
+            npm ci || npm install
+            npx playwright install --with-deps || true
+          fi
+
+      - name: E2E tests
+        run: |
+          if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
+            npx playwright test || true
+          fi
+
+      - name: Run manifest (if present)
+        run: |
+          if [ -f .testforge/run-manifest.json ]; then
+            python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+          fi
+
+      - name: Quality gate
+        run: |
+          if [ -f .testforge/runs/run-results.json ]; then
+            python testforge/testforge.py gate \
+              --results .testforge/runs/run-results.json \
+              --coverage coverage.json \
+              --validation .testforge/reports/validation-report.json \
+              --out .testforge/reports/gate-report.json
+          else
+            echo "No run results; skipping gate"
+          fi
+
+      - name: Report
+        if: always()
+        run: |
+          python testforge/testforge.py report \
+            --results .testforge/runs/run-results.json \
+            --validation .testforge/reports/validation-report.json \
+            --gate .testforge/reports/gate-report.json \
+            --out .testforge/reports/report.md || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testforge-reports
+          path: |
+            .testforge/reports/
+            .testforge/runs/
+            coverage.json
+          if-no-files-found: ignore

@@ -1,0 +1,94 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener
+  version: 1.0.0
+paths:
+  /shorten:
+    post:
+      summary: Create short URL
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, maxLength: 2048 }
+                custom_code: { type: string, pattern: "^[A-Za-z0-9]{4,12}$" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortLink"
+        "200":
+          description: Idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShortLink"
+        "400":
+          description: Invalid URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error_code: { type: string, example: INVALID_URL }
+        "409":
+          description: Code taken
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error_code: { type: string, example: CODE_TAKEN }
+  /{code}:
+    get:
+      summary: Redirect
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        "302":
+          description: Redirect
+        "404":
+          description: Not found
+        "410":
+          description: Gone
+    delete:
+      summary: Delete short URL
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+        "404":
+          description: Not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    ShortLink:
+      type: object
+      properties:
+        code: { type: string }
+        short_url: { type: string }
+        expires_at: { type: string, nullable: true }

@@ -1,0 +1,94 @@
+{
+  "meta": {
+    "project": "example-platform",
+    "generated_at": "2026-11-10T00:00:00+00:00",
+    "source_files": ["requirements/PRD.md", "openapi.yaml"],
+    "assumptions": ["测试环境提供 /test/seed 接口"]
+  },
+  "requirements": [
+    {
+      "ac_id": "AC-001",
+      "text": "已注册且邮箱已验证的用户，正确密码登录进入 /dashboard；密码错误提示统一文案；连续失败 5 次锁定 30 分钟。",
+      "source_refs": ["requirements/PRD.md#31-登录"],
+      "priority": "P0"
+    },
+    {
+      "ac_id": "AC-002",
+      "text": "库存充足时提交订单返回 201、状态 pending_payment、扣减库存；库存不足返回 409/STOCK_INSUFFICIENT，库存不变。",
+      "source_refs": ["requirements/PRD.md#32-下单"],
+      "priority": "P0"
+    },
+    {
+      "ac_id": "AC-003",
+      "text": "相同 Idempotency-Key 重复提交只创建一个订单，第二次返回 200 且 order_id 相同。",
+      "source_refs": ["requirements/PRD.md#32-下单"],
+      "priority": "P0"
+    },
+    {
+      "ac_id": "AC-004",
+      "text": "普通用户访问他人订单返回 403；管理员访问任意订单返回 200。",
+      "source_refs": ["requirements/PRD.md#33-权限"],
+      "priority": "P1"
+    }
+  ],
+  "testable_items": [
+    {
+      "ti_id": "TI-001-LOGIN-OK",
+      "ac_ids": ["AC-001"],
+      "description": "正确邮箱+密码登录成功",
+      "category": "functional",
+      "techniques": ["scenario"],
+      "input_domain": {"fields": ["email", "password"]},
+      "source_refs": ["requirements/PRD.md#31-登录"],
+      "risk": "high"
+    },
+    {
+      "ti_id": "TI-001-PWD-LEN",
+      "ac_ids": ["AC-001"],
+      "description": "密码长度边界 7/8/20/21",
+      "category": "boundary",
+      "techniques": ["BVA"],
+      "input_domain": {"fields": ["password"], "constraints": ["8-20 位"]},
+      "source_refs": ["requirements/PRD.md#31-登录"],
+      "risk": "medium"
+    },
+    {
+      "ti_id": "TI-002-STOCK",
+      "ac_ids": ["AC-002"],
+      "description": "库存不足时拒绝下单且不扣减",
+      "category": "negative",
+      "techniques": ["EP"],
+      "input_domain": {"fields": ["sku", "qty"], "constraints": ["qty <= stock"]},
+      "source_refs": ["requirements/PRD.md#32-下单", "openapi.yaml#/paths/~1orders/post"],
+      "risk": "high"
+    },
+    {
+      "ti_id": "TI-003-IDEMPOTENCY",
+      "ac_ids": ["AC-003"],
+      "description": "相同 Idempotency-Key 重复提交",
+      "category": "integration",
+      "techniques": ["idempotency", "concurrency"],
+      "input_domain": {"fields": ["Idempotency-Key"]},
+      "source_refs": ["requirements/PRD.md#32-下单"],
+      "risk": "high"
+    },
+    {
+      "ti_id": "TI-004-PERMISSION",
+      "ac_ids": ["AC-004"],
+      "description": "普通用户/管理员访问订单的权限矩阵",
+      "category": "permission",
+      "techniques": ["permission"],
+      "input_domain": {"fields": ["role", "order_id"]},
+      "source_refs": ["requirements/PRD.md#33-权限"],
+      "risk": "high"
+    }
+  ],
+  "gap_list": [
+    {
+      "gap_id": "GAP-001",
+      "description": "锁定 30 分钟后是否自动解锁，还是需要管理员操作？",
+      "impact": "影响锁定相关用例的预期",
+      "owner": "产品经理"
+    }
+  ]
+}

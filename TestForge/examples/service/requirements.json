@@ -1,0 +1,9 @@
+{
+  "requirements": [
+    { "ac_id": "AC-001", "text": "合法 URL 创建短链，返回 201 + code + short_url。" },
+    { "ac_id": "AC-002", "text": "非法 URL（非 http/https、空、>2048）返回 400 INVALID_URL。" },
+    { "ac_id": "AC-003", "text": "重复 custom_code 返回 409 CODE_TAKEN，不覆盖已有短链。" },
+    { "ac_id": "AC-004", "text": "有效 code 302 到原 URL；过期 code 返回 410。" },
+    { "ac_id": "AC-005", "text": "创建者删除后短链不可访问；非创建者删除返回 403。" }
+  ]
+}

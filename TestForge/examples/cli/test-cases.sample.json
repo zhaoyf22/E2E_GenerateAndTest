@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "project": "example-cli",
+    "generated_at": "2026-11-10T00:00:00+00:00",
+    "assumptions": ["测试在临时目录运行，二进制名为 mytool"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-CLI-001",
+      "title": "合法输入转换为 JSON 输出到 stdout",
+      "ac_ids": ["AC-001"],
+      "ti_ids": ["TI-001-HAPPY"],
+      "source_refs": ["DOC-0001", "requirements/cli.md#命令"],
+      "technique": "scenario",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": ["临时目录存在 input.txt，内容为 name: alice"],
+      "steps": [
+        {"action": "执行 mytool convert --input input.txt --format json", "data": "input.txt", "expected": "退出码 0"},
+        {"action": "解析 stdout", "expected": "是合法 JSON，包含 name=alice"}
+      ],
+      "test_data": {"input": "name: alice", "format": "json"},
+      "expected_result": "退出码 0，stdout 为合法 JSON {name: alice}",
+      "postconditions": ["删除临时目录"],
+      "automatable": true,
+      "notes": ""
+    },
+    {
+      "id": "TC-CLI-002",
+      "title": "输入文件不存在时退出码 2",
+      "ac_ids": ["AC-002"],
+      "ti_ids": ["TI-002-INPUT-MISSING"],
+      "source_refs": ["DOC-0001", "requirements/cli.md#规则"],
+      "technique": "error-guessing",
+      "priority": "P1",
+      "type": "negative",
+      "preconditions": ["当前目录没有 missing.txt"],
+      "steps": [
+        {"action": "执行 mytool convert --input missing.txt --format json", "expected": "退出码 2"},
+        {"action": "检查 stderr", "expected": "包含 INPUT_NOT_FOUND"}
+      ],
+      "test_data": {"input": "missing.txt"},
+      "expected_result": "退出码 2，stderr 含 INPUT_NOT_FOUND，无 stdout 数据",
+      "postconditions": [],
+      "automatable": true,
+      "notes": ""
+    },
+    {
+      "id": "TC-CLI-003",
+      "title": "非法 format 时退出码 2",
+      "ac_ids": ["AC-002"],
+      "ti_ids": ["TI-003-FORMAT"],
+      "source_refs": ["DOC-0001", "requirements/cli.md#规则"],
+      "technique": "EP",
+      "priority": "P1",
+      "type": "negative",
+      "preconditions": ["input.txt 存在"],
+      "steps": [
+        {"action": "执行 mytool convert --input input.txt --format xml", "expected": "退出码 2"},
+        {"action": "检查 stderr", "expected": "包含 INVALID_FORMAT"}
+      ],
+      "test_data": {"format": "xml"},
+      "expected_result": "退出码 2，stderr 含 INVALID_FORMAT",
+      "postconditions": [],
+      "automatable": true,
+      "notes": "另需覆盖缺失 --format"
+    },
+    {
+      "id": "TC-CLI-004",
+      "title": "输出文件已存在且无 --overwrite 时不覆盖",
+      "ac_ids": ["AC-003"],
+      "ti_ids": ["TI-004-OVERWRITE"],
+      "source_refs": ["DOC-0001", "requirements/cli.md#规则"],
+      "technique": "DT",
+      "priority": "P0",
+      "type": "boundary",
+      "preconditions": ["input.txt 存在", "out.json 已存在且内容为 old"],
+      "steps": [
+        {"action": "执行 mytool convert --input input.txt --format json --output out.json", "expected": "退出码 3"},
+        {"action": "读取 out.json", "expected": "内容仍为 old"},
+        {"action": "加 --overwrite 重试", "expected": "退出码 0，out.json 变为新内容"}
+      ],
+      "test_data": {"output": "out.json", "existing": "old"},
+      "expected_result": "无 --overwrite 时退出码 3 且不覆盖；有 --overwrite 时成功覆盖",
+      "postconditions": ["删除临时目录"],
+      "automatable": true,
+      "notes": "决策表：文件存在 × overwrite 标志"
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-CLI-001"],
+    "AC-002": ["TC-CLI-002", "TC-CLI-003"],
+    "AC-003": ["TC-CLI-004"]
+  },
+  "gap_list": [
+    {"gap_id": "GAP-001", "description": "AC-004 空输入用例未包含", "impact": "边界覆盖不足", "owner": "QA"}
+  ],
+  "self_check": {
+    "missing": ["AC-004"],
+    "duplicates": [],
+    "unexecutable": [],
+    "unsupported_expectations": []
+  }
+}

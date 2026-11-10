@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "project": "example-platform",
+    "base_url": "http://localhost:8000"
+  },
+  "suites": [
+    {
+      "name": "unit",
+      "command": "pytest -q",
+      "cwd": ".",
+      "timeout": 600
+    },
+    {
+      "name": "api",
+      "command": "pytest tests/api -q",
+      "cwd": ".",
+      "timeout": 600
+    },
+    {
+      "name": "e2e",
+      "command": "npx playwright test",
+      "cwd": ".",
+      "timeout": 1800,
+      "env": {
+        "BASE_URL": "http://localhost:3000",
+        "API_URL": "http://localhost:8000"
+      }
+    }
+  ]
+}
