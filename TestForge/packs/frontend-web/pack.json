@@ -1,0 +1,37 @@
+{
+  "id": "frontend-web",
+  "display_name": "Frontend Web",
+  "version": "0.1.0-stub",
+  "detect": {
+    "files": ["package.json", "vite.config.ts", "vite.config.js", "playwright.config.ts"],
+    "globs": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.svelte"],
+    "priority": 10
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "PRD.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml"],
+    "code": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "src/**/*.svelte"],
+    "tests": ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e/**/*.ts"]
+  },
+  "tools": [
+    { "name": "node", "command": "node --version", "required": true, "install": "https://nodejs.org/" },
+    { "name": "npm", "command": "npm --version", "required": true, "install": "bundled with Node" },
+    { "name": "playwright", "command": "npx playwright --version", "required": false, "install": "npm i -D @playwright/test" }
+  ],
+  "commands": {
+    "unit": "npx vitest run",
+    "e2e": "npx playwright test",
+    "a11y": "npx playwright test -g @a11y",
+    "visual": "npx playwright test -g @visual",
+    "coverage": "npx vitest run --coverage"
+  },
+  "coverage": { "parser": "istanbul", "report": "coverage/coverage-summary.json" },
+  "mutation": { "parser": "none" },
+  "templates": [],
+  "scaffold": { "default_template": "playwright" },
+  "prompt_partials": ["partials/frontend.md"],
+  "adapters": [],
+  "ci": [],
+  "acceptance": "acceptance.md",
+  "requires": ["node>=20", "vitest", "playwright"]
+}

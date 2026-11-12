@@ -1,0 +1,10 @@
+{
+  "id": "cpp-cli",
+  "stacks": [
+    {
+      "id": "cli",
+      "pack": "cpp-cli",
+      "root": "."
+    }
+  ]
+}

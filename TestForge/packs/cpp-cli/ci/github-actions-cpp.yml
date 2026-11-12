@@ -1,0 +1,34 @@
+name: testforge-cpp
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Build
+        run: cmake --build build -j
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Validate cases
+        run: |
+          if [ -f .testforge/cases/test-cases.json ]; then
+            python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testforge-cpp
+          path: |
+            build/Testing/
+            .testforge/reports/
+          if-no-files-found: ignore

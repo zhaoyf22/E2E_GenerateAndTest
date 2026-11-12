@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TestForge Config",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["platform", "service", "cli", "frontend", "backend"]
+        },
+        "root": { "type": "string", "default": "." }
+      },
+      "additionalProperties": true
+    },
+    "stacks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "pack"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "pack": { "type": "string", "minLength": 1 },
+          "root": { "type": "string", "default": "." },
+          "kind": { "type": "string", "enum": ["language", "surface"], "default": "language" },
+          "commands": { "type": "object", "additionalProperties": { "type": "string" } },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          },
+          "coverage": { "type": "object" },
+          "mutation": { "type": "object" },
+          "quality_gates": { "type": "object" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "quality_gates": { "type": "object" },
+    "inputs": { "type": "object" },
+    "commands": { "type": "object" },
+    "paths": { "type": "object" },
+    "generation": { "type": "object" },
+    "adapters": { "type": "object" }
+  },
+  "additionalProperties": true
+}

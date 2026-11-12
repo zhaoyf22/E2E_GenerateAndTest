@@ -54,6 +54,32 @@ python testforge/testforge.py report --results .testforge/runs/run-results.json
 - `testforge/templates/`：用例/Playwright/pytest/API 模板
 - `.testforge/`：上下文、用例、运行结果、报告
 
-## 项目类型
+## 场景包（packs）
 
-`platform` / `service` / `cli` / `frontend` / `backend`，用 `--profile` 初始化。不同 profile 只改默认输入/命令/门禁，提示词和方法不变。
+TestForge 现在是“通用内核 + 场景包”：
+
+- `python-service`：pytest/coverage/Testcontainers/Schemathesis/Hypothesis
+- `java-service`：Maven/JUnit 5/Testcontainers/WireMock/REST Assured/PIT
+- `cpp-cli`：CMake/CTest/GoogleTest/Catch2/Mull/FuzzTest/ApprovalTests/CLI11
+- `frontend-web`、`k8s`：批次 1 为骨架，批次 2 补完整模板
+
+初始化：
+
+```bash
+python testforge/testforge.py init --list-packs
+python testforge/testforge.py init --profile python-service --target .
+python testforge/testforge.py init --stack python-service:services/api --stack java-service:services/order --surface k8s
+python testforge/testforge.py init --detect --target .
+```
+
+新增命令：
+
+```bash
+python testforge/testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack web --out e2e/generated
+python testforge/testforge.py export --cases .testforge/cases/test-cases.json --format testrail
+python testforge/testforge.py export --cases .testforge/cases/test-cases.json --format xray
+python testforge/testforge.py prompt --stack api --stage 02-test-design
+python testforge/testforge.py mcp --allow-write
+```
+
+旧 `--profile platform/service/cli/frontend/backend` 仍可用，会自动映射到 pack 组合或单 stack。

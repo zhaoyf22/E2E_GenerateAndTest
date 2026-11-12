@@ -1,0 +1,35 @@
+name: testforge-java
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Test + JaCoCo
+        run: mvn -q test jacoco:report
+      - name: Validate cases
+        run: |
+          if [ -f .testforge/cases/test-cases.json ]; then
+            python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
+          fi
+      - name: PIT (optional)
+        run: mvn -q org.pitest:pitest-maven:mutationCoverage || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testforge-java
+          path: |
+            target/site/jacoco/
+            target/pit-reports/
+            .testforge/reports/
+          if-no-files-found: ignore

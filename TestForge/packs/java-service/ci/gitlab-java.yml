@@ -1,0 +1,12 @@
+testforge-java:
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - mvn -q test jacoco:report
+    - if [ -f .testforge/cases/test-cases.json ]; then python testforge/testforge.py validate --cases .testforge/cases/test-cases.json; fi
+    - mvn -q org.pitest:pitest-maven:mutationCoverage || true
+  artifacts:
+    when: always
+    paths:
+      - target/site/jacoco/
+      - target/pit-reports/
+      - .testforge/reports/

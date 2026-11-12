@@ -1,0 +1,10 @@
+{
+  "id": "java-service",
+  "stacks": [
+    {
+      "id": "svc",
+      "pack": "java-service",
+      "root": "."
+    }
+  ]
+}

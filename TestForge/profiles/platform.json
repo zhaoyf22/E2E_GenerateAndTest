@@ -1,0 +1,12 @@
+{
+  "id": "platform",
+  "stacks": [
+    { "id": "web", "pack": "frontend-web", "root": "frontend" },
+    { "id": "api", "pack": "python-service", "root": "services/api" },
+    { "id": "svc", "pack": "java-service", "root": "services/order" },
+    { "id": "cli", "pack": "cpp-cli", "root": "tools/cli" }
+  ],
+  "surfaces": [
+    { "id": "k8s", "pack": "k8s", "root": "deploy", "kind": "surface" }
+  ]
+}

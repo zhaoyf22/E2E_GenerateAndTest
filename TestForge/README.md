@@ -7,6 +7,42 @@
 
 ---
 
+## 0. 当前架构（2026-11-12 更新）
+
+TestForge 现在是 **通用内核 + 可组合场景包（packs）**：
+
+- `core/`：语言无关的配置、pack 加载、栈检测、scaffold、TestRail/Xray 导出、MCP、prompt 组合。
+- `packs/`：每个场景自带 `pack.json`、模板、prompt partial、适配器、CI、acceptance。
+- `profiles/`：pack 组合；`init` 可以用 `--profile`、`--stack`、`--surface`、`--detect` 装配。
+- 一个 `testforge.config.json` 可以同时声明多个 stack（web / python / java / cpp / k8s）。
+
+**批次 1 已实现：**
+
+| Pack | 状态 |
+|---|---|
+| `python-service` | 完整：pytest/coverage/Testcontainers/Schemathesis/Hypothesis |
+| `java-service` | 完整：JUnit 5/Testcontainers/WireMock/REST Assured/PIT/jqwik/Jazzer 适配 |
+| `cpp-cli` | 完整：CMake/CTest/GoogleTest/Catch2/Mull/FuzzTest/RapidCheck/ApprovalTests/CLI11 |
+| `frontend-web` | 骨架：pack 可检测/初始化；Playwright/Vitest/axe/视觉模板在批次 2 |
+| `k8s` | 骨架：pack 可检测/初始化；Chainsaw/Testkube/Toxiproxy/Tracetest 模板在批次 2 |
+
+**新增命令：**
+
+```bash
+python testforge.py init --list-packs
+python testforge.py init --stack python-service --target . --dry-run
+python testforge.py init --detect --target . --dry-run
+python testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack web --out e2e/generated
+python testforge.py export --cases .testforge/cases/test-cases.json --format testrail
+python testforge.py export --cases .testforge/cases/test-cases.json --format xray
+python testforge.py prompt --stack api --stage 02-test-design
+python testforge.py mcp --allow-write
+```
+
+旧的 `--profile platform/service/cli/frontend/backend` 仍然可用，会自动映射到 pack 组合或单 stack。
+
+---
+
 ## 1. 它解决什么问题
 
 | 痛点 | TestForge 的做法 |
@@ -25,20 +61,22 @@
 
 ```text
 TestForge/
-├── testforge.py                 # 统一 CLI：init/pack/validate/matrix/export/run/gate/report/doctor
-├── config/
-│   ├── testforge.config.example.json
-│   └── profiles/                # platform / service / cli / frontend / backend
-├── schemas/                     # testable-items / test-cases / e2e-cases / run-manifest
+├── testforge.py                 # CLI：init/pack/validate/matrix/scaffold/export/run/gate/report/mcp/prompt/doctor
+├── core/                        # 语言无关内核（config/packs/detect/scaffold/export_formats/mcp/prompt）
+├── packs/                       # 场景包：python-service / java-service / cpp-cli / frontend-web / k8s
+├── profiles/                    # pack 组合：platform / python-service / java-service / cpp-cli / web
+├── config/                      # 旧版单 profile 配置（向后兼容）
+├── schemas/                     # testable-items / test-cases / e2e-cases / run-manifest / config / pack
 ├── prompts/                     # 00-system ... 08-report
 ├── skills/                      # 7 个 Agent Skills（需求、用例、E2E、API、代码、评审、报告）
 ├── agents/                      # 7 个 Subagents（orchestrator、analyst、designer、automation、e2e、reviewer、runner）
 ├── commands/                    # Claude Code slash commands
-├── templates/                   # 用例、Gherkin、Playwright、pytest、API、测试计划、缺陷
-├── adapters/                    # Docling / Schemathesis / Playwright / pytest / mutation / MCP 接入说明
-├── ci/                          # GitHub Actions / GitLab CI
-├── examples/                    # platform / service / cli 三个示例
-└── docs/                        # 架构、工作流、质量门禁、安全
+├── templates/                   # 通用模板
+├── adapters/                    # 通用适配器说明
+├── ci/                          # 通用 CI；各 pack 也有自己的 ci/
+├── tests/                       # unittest 测试（37 个）
+├── examples/                    # platform / python-service / java-service / cpp-cli
+└── docs/                        # 架构、工作流、质量门禁、安全、审查记录
 ```
 
 ---
@@ -89,17 +127,34 @@ python testforge/testforge.py export --cases .testforge/cases/test-cases.json --
 
 ---
 
-## 4. 项目类型与 profile
+## 4. 场景包（packs）与 profile
 
-| Profile | 适用 | 默认输入 | 默认命令 |
+| Pack | 适用 | 默认命令 | 状态 |
 |---|---|---|---|
-| `platform` | 前端 + 后端 + API + DB | docs、openapi、前端/后端代码 | unit、api、e2e |
-| `service` | 单个后端服务/微服务 | docs、openapi、服务代码 | unit、api |
-| `cli` | 命令行工具 | docs、CLI 代码 | unit、cli-smoke |
-| `frontend` | 单页应用/客户端 | docs、前端代码 | unit、e2e |
-| `backend` | 纯后端/库 | docs、代码 | unit、api |
+| `python-service` | Python API/服务 | pytest、coverage.py、mutmut | 完整 |
+| `java-service` | Java/Spring 服务 | Maven、JaCoCo、PIT | 完整 |
+| `cpp-cli` | C++ 客户端/CLI | CMake/CTest、Mull、lcov | 完整 |
+| `frontend-web` | React/Vue/Svelte Web | Vitest、Playwright、axe、视觉 | 骨架（批次 2） |
+| `k8s` | Kubernetes/集群 | Chainsaw、Testkube、Toxiproxy | 骨架（批次 2） |
 
-`init --profile` 会生成对应默认配置；之后按项目实际情况改 `inputs`、`stack`、`commands` 即可。
+**组合 profile**：
+
+```bash
+python testforge.py init --profile platform   # web + python + java + cpp + k8s
+python testforge.py init --profile python-service
+python testforge.py init --profile java-service
+python testforge.py init --profile cpp-cli
+python testforge.py init --profile web
+```
+
+**显式装配**：
+
+```bash
+python testforge.py init --stack python-service:services/api --stack java-service:services/order --surface k8s
+python testforge.py init --detect --target .
+```
+
+旧 profile `service/cli/frontend/backend` 仍可用，会按检测或固定顺序回退到单 stack；旧配置无 `stacks` 时会合成 `default` stack。
 
 ---
 

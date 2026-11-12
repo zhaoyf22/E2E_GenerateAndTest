@@ -26,6 +26,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from core.config import normalize_stacks
+from core.detect import detect_stacks
+from core.packs import load_packs
+
 SUITE_ROOT = Path(__file__).resolve().parent
 VERSION = "0.1.0"
 DEFAULT_CONFIG_NAME = "testforge.config.json"
@@ -372,30 +376,192 @@ def fence_for(text: str) -> str:
 # init
 # ---------------------------------------------------------------------------
 
+def _split_values(values: Optional[Sequence[str]]) -> List[str]:
+    result: List[str] = []
+    for value in values or []:
+        for part in str(value).split(","):
+            part = part.strip()
+            if part:
+                result.append(part)
+    return result
+
+
+def _unique_stack_id(base: str, used: set) -> str:
+    candidate = base or "stack"
+    index = 2
+    while candidate in used:
+        candidate = f"{base}-{index}"
+        index += 1
+    used.add(candidate)
+    return candidate
+
+
+def _stack_from_spec(spec: str, kind: str, used: set) -> Dict[str, Any]:
+    pack, _, root = spec.partition(":")
+    pack = pack.strip()
+    root = root.strip() or "."
+    if not pack:
+        raise SystemExit(f"Invalid --{kind} spec: {spec!r}")
+    base = pack if root == "." else f"{pack}-{slugify(root)}"
+    return {"id": _unique_stack_id(base, used), "pack": pack, "root": root, "kind": kind}
+
+
+def _load_new_profile(name: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not name:
+        return None
+    path = SUITE_ROOT / "profiles" / f"{name}.json"
+    return read_json(path) if path.is_file() else None
+
+
+def _load_old_profile(name: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not name:
+        return None
+    path = SUITE_ROOT / "config" / "profiles" / f"{name}.json"
+    return read_json(path) if path.is_file() else None
+
+
+def _build_run_manifest(config: Dict[str, Any], packs: Dict[str, Any], target: Path) -> Dict[str, Any]:
+    stacks = normalize_stacks(config, packs)
+    manifest = {"meta": {"project": target.name, "generated_at": now_iso()}, "suites": []}
+    manifest_dir = (target / ".testforge").resolve()
+    project_base = (target / (as_dict(config.get("project")).get("root") or ".")).resolve()
+    for stack in stacks:
+        stack_dir = (project_base / (stack.get("root") or ".")).resolve()
+        cwd = os.path.relpath(str(stack_dir), str(manifest_dir)).replace("\\", "/")
+        commands = stack.get("commands") or {}
+        for key, command in commands.items():
+            if key in ("unit", "integration", "api", "e2e", "orchestrate", "chaos", "cli-smoke"):
+                kind, run_after = "test", []
+            elif key in ("coverage", "mutation"):
+                kind = "report"
+                run_after = [
+                    f"{stack.get('id')}-{dep}"
+                    for dep in ("unit", "integration")
+                    if dep in commands
+                ]
+            else:
+                continue
+            timeout = 1800 if key in ("e2e", "orchestrate", "chaos") else 600
+            manifest["suites"].append({
+                "name": f"{stack.get('id')}-{key}",
+                "command": command,
+                "cwd": cwd,
+                "timeout": timeout,
+                "kind": kind,
+                "stack_id": stack.get("id"),
+                "pack": stack.get("pack"),
+                "run_after": run_after,
+            })
+    return manifest
+
+
 def cmd_init(args: argparse.Namespace) -> int:
+    packs = load_packs(SUITE_ROOT / "packs")
+    if args.list_packs:
+        for pack in sorted(packs.values(), key=lambda item: item.id):
+            print(f"{pack.id:16} {pack.display_name}")
+        return 0
+
+    if not args.target:
+        print("--target is required unless --list-packs is used.")
+        return 2
     target = Path(args.target).resolve()
     if target == SUITE_ROOT:
         print("Target is the suite root; nothing to copy. Use --target <your-project>.")
         return 0
-    profile_path = SUITE_ROOT / "config" / "profiles" / f"{args.profile}.json"
-    if not profile_path.exists():
-        print(f"Unknown profile: {args.profile}. Available: "
-              + ", ".join(p.stem for p in (SUITE_ROOT / "config" / "profiles").glob("*.json")))
-        return 2
+
+    profile_name = args.profile
+    if profile_name is None and not args.detect and not args.stack and not args.surface:
+        profile_name = "platform"
+    new_profile = _load_new_profile(profile_name)
+    old_profile = _load_old_profile(profile_name)
+
+    used_ids: set = set()
+    stacks: List[Dict[str, Any]] = []
+    surfaces: List[Dict[str, Any]] = []
+    if new_profile:
+        for raw in new_profile.get("stacks") or []:
+            item = dict(raw)
+            item["kind"] = item.get("kind", "language")
+            item["id"] = _unique_stack_id(str(item.get("id") or item.get("pack")), used_ids)
+            stacks.append(item)
+        for raw in new_profile.get("surfaces") or []:
+            item = dict(raw)
+            item["kind"] = "surface"
+            item["id"] = _unique_stack_id(str(item.get("id") or item.get("pack")), used_ids)
+            surfaces.append(item)
+
+    for spec in _split_values(args.stack):
+        item = _stack_from_spec(spec, "language", used_ids)
+        if item:
+            stacks.append(item)
+    for spec in _split_values(args.surface):
+        item = _stack_from_spec(spec, "surface", used_ids)
+        if item:
+            if item["root"] == ".":
+                item["root"] = "deploy"
+            surfaces.append(item)
+
+    if args.detect:
+        try:
+            detected = detect_stacks(target, packs)
+        except Exception as exc:
+            print(f"Warning: detection failed: {exc}")
+            detected = []
+        for item in detected:
+            if any(s.get("pack") == item.pack and s.get("root") == item.root for s in stacks):
+                continue
+            stacks.append({
+                "id": _unique_stack_id(item.id, used_ids),
+                "pack": item.pack,
+                "root": item.root,
+                "kind": "language",
+            })
+
+    config = deep_merge(DEFAULT_CONFIG, old_profile or {})
+    config["project"]["name"] = target.name
+    if old_profile:
+        config["project"]["type"] = (old_profile.get("project") or {}).get("type") or "platform"
+    elif stacks:
+        type_map = {
+            "python-service": "service",
+            "java-service": "service",
+            "cpp-cli": "cli",
+            "frontend-web": "frontend",
+            "k8s": "platform",
+        }
+        config["project"]["type"] = type_map.get(str(stacks[0].get("pack")), "platform")
+    else:
+        config["project"]["type"] = "platform"
+    config["project"]["root"] = "."
+    if stacks or surfaces:
+        config["stacks"] = stacks + surfaces
+    elif not config.get("stacks"):
+        # Old-profile fallback: synthesize a single stack from project.type.
+        config["stacks"] = normalize_stacks(config, packs)
+    manifest = _build_run_manifest(config, packs, target)
+
+    if args.dry_run:
+        print(json.dumps({
+            "target": str(target),
+            "profile": profile_name,
+            "stacks": config.get("stacks", []),
+            "config": config,
+            "run_manifest": manifest,
+        }, ensure_ascii=False, indent=2))
+        return 0
 
     target.mkdir(parents=True, exist_ok=True)
     if (target / ".claude").exists():
         print("Warning: .claude/ already exists; TestForge files with the same names will be overwritten.")
-    profile = read_json(profile_path)
-    config = deep_merge(DEFAULT_CONFIG, profile)
-    config["project"]["name"] = target.name
-    config["project"]["type"] = profile.get("project", {}).get("type", args.profile)
-    config["project"]["root"] = "."
 
     copies = [
         ("skills", ".claude/skills"),
         ("agents", ".claude/agents"),
         ("commands", ".claude/commands"),
+        ("core", "testforge/core"),
+        ("packs", "testforge/packs"),
+        ("profiles", "testforge/profiles"),
         ("prompts", "testforge/prompts"),
         ("schemas", "testforge/schemas"),
         ("templates", "testforge/templates"),
@@ -408,8 +574,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         src = SUITE_ROOT / src_rel
         if not src.exists():
             continue
-        dst = target / dst_rel
-        shutil.copytree(src, dst, dirs_exist_ok=True)
+        shutil.copytree(src, target / dst_rel, dirs_exist_ok=True)
 
     for name in ("testforge.py", "README.md", "QUICKSTART.md", "AGENTS.md", "LICENSE", "requirements-optional.txt"):
         src = SUITE_ROOT / name
@@ -430,33 +595,12 @@ def cmd_init(args: argparse.Namespace) -> int:
     config_path = target / DEFAULT_CONFIG_NAME
     if config_path.exists() and not args.force:
         print(f"Keeping existing config: {config_path}")
-        try:
-            config = deep_merge(DEFAULT_CONFIG, read_json(config_path))
-        except Exception:
-            pass
     else:
         write_json(config_path, config)
         print(f"Wrote config: {config_path}")
 
-    manifest = {"meta": {"project": target.name, "generated_at": now_iso()}, "suites": []}
-    commands_config = config.get("commands")
-    if not isinstance(commands_config, dict):
-        commands_config = {}
-    project_root = (target / (as_dict(config.get("project")).get("root") or ".")).resolve()
-    manifest_dir = (target / ".testforge").resolve()
-    manifest_cwd = os.path.relpath(str(project_root), str(manifest_dir)).replace("\\", "/")
-    for name, key, timeout in (
-        ("unit", "unit", 600),
-        ("api", "api", 600),
-        ("e2e", "e2e", 1800),
-        ("cli-smoke", "cli-smoke", 300),
-    ):
-        command = commands_config.get(key)
-        if command:
-            # run-manifest.json lives in .testforge/; cwd points back to the configured project root.
-            manifest["suites"].append({"name": name, "command": command, "cwd": manifest_cwd, "timeout": timeout})
     manifest_path = target / ".testforge" / "run-manifest.json"
-    if manifest["suites"] and (not manifest_path.exists() or args.force):
+    if manifest["suites"] and (not manifest_path.exists() or args.force or args.upgrade):
         write_json(manifest_path, manifest)
         print(f"Wrote run manifest: {manifest_path}")
 
@@ -470,7 +614,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     print("\nTestForge installed.")
     print("Next:")
-    print("  1. Edit testforge.config.json (inputs / stack / commands).")
+    print("  1. Edit testforge.config.json (stacks / inputs / commands).")
     print("  2. python testforge/testforge.py doctor")
     print("  3. python testforge/testforge.py pack")
     print("  4. In Claude Code: /test-req, /test-design, /test-e2e, /test-review, /test-run")
@@ -555,6 +699,39 @@ def cmd_pack(args: argparse.Namespace) -> int:
     out_dir = Path(args.out).resolve() if args.out else (root / paths.get("context", ".testforge/context"))
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Attach stack metadata without changing the legacy single-stack output.
+    try:
+        from core.config import normalize_stacks, stack_root
+        from core.packs import load_packs
+
+        packs = load_packs(SUITE_ROOT / "packs")
+        stacks = normalize_stacks(config, packs)
+    except Exception:
+        stacks = []
+    stacks_info = [
+        {"id": stack.get("id", "default"), "pack": stack.get("pack", ""), "root": stack.get("root", ".")}
+        for stack in stacks
+    ]
+    for entry in entries:
+        file_rel = entry.get("file", "")
+        entry["stack_id"] = "default"
+        entry["pack"] = ""
+        if not file_rel or file_rel == "git diff":
+            continue
+        abs_file = (root / file_rel).resolve()
+        matches = []
+        for stack in stacks:
+            sroot = stack_root(config, stack, str(config_path))
+            try:
+                abs_file.relative_to(sroot)
+                matches.append((len(sroot.parts), stack))
+            except ValueError:
+                continue
+        if matches:
+            matched = max(matches, key=lambda item: item[0])[1]
+            entry["stack_id"] = matched.get("id", "default")
+            entry["pack"] = matched.get("pack", "")
+
     by_kind: Dict[str, int] = {}
     for entry in entries:
         by_kind[entry["kind"]] = by_kind.get(entry["kind"], 0) + 1
@@ -573,6 +750,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
             "unsupported": len(unsupported),
             "tokens_estimate": sum(e["tokens_estimate"] for e in entries),
         },
+        "stacks": stacks_info,
         "entries": entries,
         "unsupported": unsupported,
     }
@@ -596,6 +774,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
         lines.append("")
         lines.append(f"- source: `{entry['source']}`")
         lines.append(f"- kind: `{entry['kind']}`")
+        lines.append(f"- stack: `{entry.get('stack_id', 'default')}` / pack: `{entry.get('pack', '')}`")
         lines.append(f"- extractor: `{entry['extractor']}`")
         lines.append(f"- tokens: ~{entry['tokens_estimate']}")
         if entry["truncated"]:
@@ -875,6 +1054,9 @@ def cmd_validate(args: argparse.Namespace) -> int:
         return validate_testable_items(raw, args)
 
     cases = load_cases(args.cases)
+    stack_filter = getattr(args, "stack", None)
+    if stack_filter:
+        cases = [c for c in cases if str(c.get("stack_id") or "default") == stack_filter]
     config_path = normalize_config_path(args.config)
     config = load_config(str(config_path)) if config_path.exists() else DEFAULT_CONFIG
     gates = as_dict(config.get("quality_gates"))
@@ -962,6 +1144,24 @@ def cmd_validate(args: argparse.Namespace) -> int:
     duplicates = find_duplicates(cases, threshold)
     max_similarity = max((d["similarity"] for d in duplicates), default=0.0)
 
+    case_stack = {
+        str(case.get("id") or f"case-{index + 1}"): str(case.get("stack_id") or "default")
+        for index, case in enumerate(cases)
+        if isinstance(case, dict)
+    }
+    by_stack: Dict[str, Dict[str, int]] = {}
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        sid = str(case.get("stack_id") or "default")
+        by_stack.setdefault(sid, {"total": 0, "errors": 0, "warnings": 0})["total"] += 1
+    for item in errors:
+        sid = case_stack.get(str(item.get("case")), "default")
+        by_stack.setdefault(sid, {"total": 0, "errors": 0, "warnings": 0})["errors"] += 1
+    for item in warnings:
+        sid = case_stack.get(str(item.get("case")), "default")
+        by_stack.setdefault(sid, {"total": 0, "errors": 0, "warnings": 0})["warnings"] += 1
+
     requirements = load_requirements(args.requirements)
     known_acs = set(requirements)
     covered = set()
@@ -1012,6 +1212,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             "cases_file": str(Path(args.cases).resolve()),
             "requirements_file": str(Path(args.requirements).resolve()) if args.requirements else None,
             "duplicate_threshold": threshold,
+            "stack_filter": stack_filter,
         },
         "summary": {
             "total_cases": len(cases),
@@ -1023,6 +1224,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             "by_type": by_type,
             "by_priority": by_priority,
             "by_technique": by_technique,
+            "by_stack": by_stack,
         },
         "coverage": {
             "requirements": len(requirements),
@@ -1065,22 +1267,40 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_matrix(args: argparse.Namespace) -> int:
     cases = load_cases(args.cases)
+    stack_filter = getattr(args, "stack", None)
+    if stack_filter:
+        cases = [c for c in cases if str(c.get("stack_id") or "default") == stack_filter]
     requirements = load_requirements(args.requirements)
     matrix: Dict[str, List[str]] = {ac: [] for ac in requirements}
+    matrix_by_stack: Dict[str, Dict[str, List[str]]] = {ac: {} for ac in requirements}
     orphan_cases: List[str] = []
     for case in cases:
         cid = str(case.get("id") or "")
+        stack_id = str(case.get("stack_id") or "default")
         ac_ids = as_list(case.get("ac_ids"))
         if not ac_ids:
             orphan_cases.append(cid)
         for ac in ac_ids:
-            matrix.setdefault(str(ac), []).append(cid)
+            ac_key = str(ac)
+            matrix.setdefault(ac_key, []).append(cid)
+            matrix_by_stack.setdefault(ac_key, {}).setdefault(stack_id, []).append(cid)
     uncovered = [ac for ac, ids in matrix.items() if not ids]
+    uncovered_by_stack = {
+        ac: [stack_id for stack_id, ids in stacks.items() if not ids]
+        for ac, stacks in matrix_by_stack.items()
+    }
 
     payload = {
-        "meta": {"generated_at": now_iso(), "cases": len(cases), "requirements": len(requirements)},
+        "meta": {
+            "generated_at": now_iso(),
+            "cases": len(cases),
+            "requirements": len(requirements),
+            "stack_filter": stack_filter,
+        },
         "matrix": matrix,
+        "matrix_by_stack": matrix_by_stack,
         "uncovered": uncovered,
+        "uncovered_by_stack": uncovered_by_stack,
         "orphan_cases": orphan_cases,
     }
     out = Path(args.out).resolve() if args.out else Path(args.cases).resolve().parent / "coverage-matrix.json"
@@ -1257,8 +1477,42 @@ def export_xlsx(cases: Sequence[Dict[str, Any]], out: Path) -> Path:
     return out
 
 
-def cmd_export(args: argparse.Namespace) -> int:
+def cmd_scaffold(args: argparse.Namespace) -> int:
+    from core.config import normalize_stacks, stack_root
+    from core.packs import get_pack, load_packs
+    from core.scaffold import scaffold_cases
+
+    config_path = normalize_config_path(args.config).resolve()
+    config = load_config(str(config_path))
+    packs = load_packs(SUITE_ROOT / "packs")
+    stacks = normalize_stacks(config, packs)
+    stack = next((item for item in stacks if item.get("id") == args.stack), None)
+    if stack is None:
+        available = ", ".join(item.get("id", "") for item in stacks)
+        raise SystemExit(f"Unknown stack: {args.stack} (available: {available})")
+    pack = get_pack(packs, stack.get("pack", ""))
     cases = load_cases(args.cases)
+    if any("stack_id" in case for case in cases):
+        cases = [case for case in cases if str(case.get("stack_id") or "default") == args.stack]
+    out_dir = Path(args.out)
+    if not out_dir.is_absolute():
+        out_dir = stack_root(config, stack, str(config_path)) / out_dir
+    manifest = scaffold_cases(cases, pack, args.stack, out_dir, force=args.force)
+    print(f"Scaffolded {len(manifest['written'])} file(s), skipped {len(manifest['skipped'])}")
+    for item in manifest["written"]:
+        print(f"  + {item['file']}")
+    for item in manifest["skipped"]:
+        print(f"  - {item.get('case_id')}: {item.get('reason')}")
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    from core.export_formats import export_testrail_csv, export_xray_csv
+
+    cases = load_cases(args.cases)
+    stack_filter = getattr(args, "stack", None)
+    if stack_filter:
+        cases = [case for case in cases if str(case.get("stack_id") or "default") == stack_filter]
     out = Path(args.out).resolve() if args.out else Path(args.cases).resolve().parent
     if out.suffix == "":
         out = out / f"test-cases.{args.format}"
@@ -1271,6 +1525,10 @@ def cmd_export(args: argparse.Namespace) -> int:
         result = export_gherkin(cases, out.with_suffix(".feature"))
     elif fmt == "xlsx":
         result = export_xlsx(cases, out.with_suffix(".xlsx"))
+    elif fmt == "testrail":
+        result = export_testrail_csv(cases, out.with_suffix(".csv"))
+    elif fmt == "xray":
+        result = export_xray_csv(cases, out.with_suffix(".csv"))
     else:
         out.parent.mkdir(parents=True, exist_ok=True)
         key = "e2e_cases" if any("feature" in case for case in cases) else "test_cases"
@@ -1330,12 +1588,19 @@ def cmd_run(args: argparse.Namespace) -> int:
         raise SystemExit(f"Invalid manifest JSON: {manifest_path}: {exc}")
     base = manifest_path.parent
     suites = manifest.get("suites") or []
+    if getattr(args, "stack", None):
+        suites = [s for s in suites if str(s.get("stack_id") or "default") == args.stack]
+    if not getattr(args, "with_reports", False):
+        suites = [s for s in suites if s.get("kind", "test") != "report"]
+    suites = sorted(suites, key=lambda s: 0 if s.get("kind", "test") == "test" else 1)
     if not suites:
         raise SystemExit("Manifest has no suites")
 
     results: List[Dict[str, Any]] = []
+    passed_names: set = set()
     for suite in suites:
         name = suite.get("name") or "suite"
+        kind = suite.get("kind", "test")
         command = suite.get("command")
         if not command:
             results.append({"name": name, "status": "error", "error": "missing command"})
@@ -1349,11 +1614,22 @@ def cmd_run(args: argparse.Namespace) -> int:
         record: Dict[str, Any] = {
             "name": name,
             "command": command,
+            "kind": kind,
+            "stack_id": suite.get("stack_id", "default"),
+            "pack": suite.get("pack", ""),
             "cwd": str(cwd),
             "started_at": now_iso(),
             "timeout": timeout,
             "allow_failure": bool(suite.get("allow_failure", False)),
         }
+        if not args.dry_run and kind == "report":
+            deps = suite.get("run_after") or []
+            missing = [dep for dep in deps if dep not in passed_names]
+            if missing:
+                record.update({"status": "skipped", "reason": f"run_after not passed: {', '.join(missing)}"})
+                results.append(record)
+                print(f"[skipped] {name}: run_after not passed")
+                continue
         if args.dry_run:
             record.update({"status": "dry-run", "duration_sec": 0})
             results.append(record)
@@ -1388,19 +1664,34 @@ def cmd_run(args: argparse.Namespace) -> int:
         })
         if status == "error":
             record["error"] = last.get("error", "")
+        if status == "passed":
+            passed_names.add(name)
         results.append(record)
         print(f"[{record['status']}] {name} ({record['duration_sec']}s)")
 
     flaky_count = sum(1 for r in results if r.get("flaky"))
+    by_stack: Dict[str, Dict[str, int]] = {}
+    for record in results:
+        sid = str(record.get("stack_id") or "default")
+        bucket = by_stack.setdefault(sid, {
+            "total": 0, "passed": 0, "failed": 0, "timeout": 0,
+            "error": 0, "flaky": 0, "skipped": 0, "dry_run": 0,
+        })
+        bucket["total"] += 1
+        status = str(record.get("status") or "")
+        if status in bucket:
+            bucket[status] += 1
     summary = {
         "total": len(results),
         "passed": sum(1 for r in results if r.get("status") == "passed"),
         "failed": sum(1 for r in results if r.get("status") == "failed"),
         "timeout": sum(1 for r in results if r.get("status") == "timeout"),
         "error": sum(1 for r in results if r.get("status") == "error"),
+        "skipped": sum(1 for r in results if r.get("status") == "skipped"),
         "flaky": flaky_count,
         "flaky_rate": round(flaky_count / len(results), 4) if results else 0.0,
         "dry_run": sum(1 for r in results if r.get("status") == "dry-run"),
+        "by_stack": by_stack,
     }
     payload = {"meta": {"tool": "testforge", "version": VERSION, "generated_at": now_iso(), "manifest": str(manifest_path)}, "summary": summary, "suites": results}
     out = Path(args.out).resolve() if args.out else base / "runs" / "run-results.json"
@@ -1472,6 +1763,17 @@ def load_mutation_score(path: Optional[str]) -> Optional[float]:
     if not p.exists():
         return None
     try:
+        if p.suffix.lower() == ".xml":
+            root = ET.parse(str(p)).getroot()
+            killed = survived = 0
+            for mutation in root.iter("mutation"):
+                status = str(mutation.get("status") or "").upper()
+                if status == "KILLED":
+                    killed += 1
+                elif status == "SURVIVED":
+                    survived += 1
+            total = killed + survived
+            return killed / total if total else None
         data = read_json(p)
         for key in ("mutation_score", "score", "mutationScore"):
             if key in data:
@@ -1507,6 +1809,43 @@ def cmd_gate(args: argparse.Namespace) -> int:
         candidate = Path(path_value)
         return str(candidate if candidate.is_absolute() else (root / candidate))
 
+    # Per-stack coverage/mutation checks. Reports resolve relative to the stack root.
+    try:
+        packs = load_packs(SUITE_ROOT / "packs")
+        stacks = normalize_stacks(config, packs)
+    except Exception:
+        stacks = []
+    project_base = config_root(config, str(config_file)) if has_config else Path.cwd()
+    for stack in stacks:
+        stack_id = str(stack.get("id") or "default")
+        stack_gates = as_dict(stack.get("quality_gates"))
+        stack_base = project_base / (stack.get("root") or ".")
+        coverage_cfg = as_dict(stack.get("coverage"))
+        coverage_parser = str(coverage_cfg.get("parser") or "")
+        coverage_report = str(coverage_cfg.get("report") or "")
+        if coverage_parser and coverage_parser != "none" and coverage_report:
+            report_path = (stack_base / coverage_report).resolve()
+            value = parse_coverage(str(report_path))
+            minimum = float(stack_gates.get("line_coverage_min", gates.get("line_coverage_min", 0.0)) or 0.0)
+            if value is None:
+                passed = bool(getattr(args, "allow_missing_reports", False))
+                add(f"{stack_id}.line_coverage", None, minimum, passed, f"missing: {report_path}")
+            else:
+                add(f"{stack_id}.line_coverage", round(value, 4), minimum, value >= minimum)
+
+        mutation_cfg = as_dict(stack.get("mutation"))
+        mutation_parser = str(mutation_cfg.get("parser") or "")
+        mutation_report = str(mutation_cfg.get("report") or "")
+        if mutation_parser and mutation_parser != "none" and mutation_report:
+            report_path = (stack_base / mutation_report).resolve()
+            value = load_mutation_score(str(report_path))
+            minimum = float(stack_gates.get("mutation_score_min", gates.get("mutation_score_min", 0.0)) or 0.0)
+            if value is None:
+                passed = bool(getattr(args, "allow_missing_reports", False))
+                add(f"{stack_id}.mutation_score", None, minimum, passed, f"missing: {report_path}")
+            else:
+                add(f"{stack_id}.mutation_score", round(value, 4), minimum, value >= minimum)
+
     suites = as_list(results.get("suites"))
     bad = [
         s for s in suites
@@ -1521,7 +1860,10 @@ def cmd_gate(args: argparse.Namespace) -> int:
         minimum = float(gates.get("line_coverage_min", 0.0) or 0.0)
         add("line_coverage", round(coverage, 4), minimum, coverage >= minimum)
     else:
-        add("line_coverage", None, gates.get("line_coverage_min", 0.0), True, "no coverage report supplied")
+        missing = bool(coverage_path)
+        passed = (not missing) or getattr(args, "allow_missing_reports", False)
+        detail = f"missing coverage report: {coverage_path}" if missing else "no coverage report supplied"
+        add("line_coverage", None, gates.get("line_coverage_min", 0.0), passed, detail)
 
     baseline = args.baseline
     if baseline is not None and coverage is not None:
@@ -1535,7 +1877,10 @@ def cmd_gate(args: argparse.Namespace) -> int:
         minimum = float(gates.get("mutation_score_min", 0.0) or 0.0)
         add("mutation_score", round(mutation, 4), minimum, mutation >= minimum)
     else:
-        add("mutation_score", None, gates.get("mutation_score_min", 0.0), True, "no mutation report supplied")
+        missing = bool(mutation_path)
+        passed = (not missing) or getattr(args, "allow_missing_reports", False)
+        detail = f"missing mutation report: {mutation_path}" if missing else "no mutation report supplied"
+        add("mutation_score", None, gates.get("mutation_score_min", 0.0), passed, detail)
 
     validation_path = resolve(args.validation or paths.get("validation_report"))
     validation = None
@@ -1566,6 +1911,7 @@ def cmd_gate(args: argparse.Namespace) -> int:
         "passed": not failures,
         "checks": checks,
         "failures": failures,
+        "stacks": (results.get("summary") or {}).get("by_stack") or {},
     }
     if args.out:
         out = Path(args.out).resolve()
@@ -1622,6 +1968,15 @@ def cmd_report(args: argparse.Namespace) -> int:
                 f"{suite.get('duration_sec', '')} | `{flatten(suite.get('command', ''))}` |"
             )
         lines.append("")
+        by_stack = summary.get("by_stack") or {}
+        if by_stack:
+            lines.extend(["### By stack", "", "| Stack | Total | Passed | Failed | Flaky |", "|---|---:|---:|---:|---:|"])
+            for stack_id, bucket in by_stack.items():
+                lines.append(
+                    f"| {stack_id} | {bucket.get('total', 0)} | {bucket.get('passed', 0)} | "
+                    f"{bucket.get('failed', 0)} | {bucket.get('flaky', 0)} |"
+                )
+            lines.append("")
 
     vsummary = as_dict(validation.get("summary"))
     if vsummary:
@@ -1694,6 +2049,46 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# MCP / prompt
+# ---------------------------------------------------------------------------
+
+def cmd_mcp(args: argparse.Namespace) -> int:
+    from core.mcp import serve
+
+    def run_cli(cli_args: List[str]) -> Tuple[int, str, str]:
+        proc = subprocess.run(
+            [sys.executable, str(SUITE_ROOT / "testforge.py")] + list(cli_args),
+            cwd=str(Path.cwd()),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=1800,
+        )
+        return proc.returncode, proc.stdout or "", proc.stderr or ""
+
+    return serve(run_cli, allow_write=args.allow_write)
+
+
+def cmd_prompt(args: argparse.Namespace) -> int:
+    from core.packs import load_packs
+    from core.prompt import compose_prompt
+
+    config_path = normalize_config_path(args.config).resolve()
+    config = load_config(str(config_path))
+    packs = load_packs(SUITE_ROOT / "packs")
+    text = compose_prompt(args.stage, args.stack, config, packs, SUITE_ROOT / "prompts")
+    if args.out:
+        out = Path(args.out).resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text + "\n", encoding="utf-8")
+        print(f"Prompt -> {out}")
+    else:
+        print(text)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------
 
@@ -1726,6 +2121,33 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print("External commands:")
     for command in ("git", "python", "pytest", "node", "npx", "docker"):
         print(f"  {'OK' if shutil.which(command) else '--'} {command}")
+
+    print("")
+    print("Pack tools:")
+    try:
+        if config_path.exists():
+            config = load_config(str(config_path))
+            packs = load_packs(SUITE_ROOT / "packs")
+            for stack in normalize_stacks(config, packs):
+                pack = packs.get(stack.get("pack", ""))
+                if not pack:
+                    continue
+                print(f"  [{stack.get('id')}] {pack.id}")
+                for tool in pack.tools:
+                    command = str(tool.get("command") or "")
+                    if not command:
+                        continue
+                    try:
+                        proc = subprocess.run(
+                            command, shell=True, capture_output=True, text=True,
+                            timeout=10, encoding="utf-8", errors="replace",
+                        )
+                        ok = proc.returncode == 0
+                    except Exception:
+                        ok = False
+                    print(f"    {'OK' if ok else '--'} {tool.get('name')} ({command})")
+    except Exception as exc:
+        print(f"  (skipped: {exc})")
     return 0
 
 
@@ -1742,8 +2164,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("init", help="Install TestForge into a project")
-    p.add_argument("--target", required=True, help="Target project directory")
-    p.add_argument("--profile", default="platform", choices=["platform", "service", "cli", "frontend", "backend"])
+    p.add_argument("--target", default=None, help="Target project directory")
+    p.add_argument("--profile", default=None,
+                   choices=["platform", "service", "cli", "frontend", "backend",
+                            "python-service", "java-service", "cpp-cli", "web"])
+    p.add_argument("--stack", action="append", default=[], help="Pack or pack:root (repeatable/comma-separated)")
+    p.add_argument("--surface", action="append", default=[], help="Surface pack, e.g. k8s (repeatable/comma-separated)")
+    p.add_argument("--detect", action="store_true", help="Detect stacks from marker files")
+    p.add_argument("--list-packs", action="store_true", help="List available packs")
+    p.add_argument("--dry-run", action="store_true", help="Print config and manifest without writing")
+    p.add_argument("--upgrade", action="store_true", help="Refresh testforge/ but preserve config and cases")
     p.add_argument("--force", action="store_true", help="Overwrite existing config")
     p.add_argument("--with-ci", action="store_true", help="Copy GitHub Actions workflow")
     p.set_defaults(func=cmd_init)
@@ -1759,6 +2189,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kind", default="auto", choices=["auto", "test-cases", "e2e", "testable"],
                    help="Input kind (auto-detected by default)")
     p.add_argument("--requirements", default=None, help="JSON with AC list")
+    p.add_argument("--stack", default=None, help="Filter cases by stack id")
     p.add_argument("--config", default=DEFAULT_CONFIG_NAME)
     p.add_argument("--out", default=None)
     p.add_argument("--similarity", type=float, default=None, help="Duplicate similarity threshold (0-1)")
@@ -1769,19 +2200,32 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("matrix", help="Build AC -> case coverage matrix")
     p.add_argument("--cases", required=True)
     p.add_argument("--requirements", required=True)
+    p.add_argument("--stack", default=None, help="Filter cases by stack id")
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_matrix)
 
-    p = sub.add_parser("export", help="Export cases to markdown/csv/gherkin/xlsx/json")
+    p = sub.add_parser("export", help="Export cases to markdown/csv/gherkin/xlsx/json/testrail/xray")
     p.add_argument("--cases", required=True)
-    p.add_argument("--format", default="markdown", choices=["markdown", "csv", "gherkin", "xlsx", "json"])
+    p.add_argument("--format", default="markdown",
+                   choices=["markdown", "csv", "gherkin", "xlsx", "json", "testrail", "xray"])
+    p.add_argument("--stack", default=None, help="Filter cases by stack id")
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_export)
+
+    p = sub.add_parser("scaffold", help="Generate test skeletons from cases")
+    p.add_argument("--cases", required=True)
+    p.add_argument("--stack", required=True)
+    p.add_argument("--out", default=".testforge/scaffold")
+    p.add_argument("--config", default=DEFAULT_CONFIG_NAME)
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_scaffold)
 
     p = sub.add_parser("run", help="Run test suites from a manifest")
     p.add_argument("--manifest", required=True)
     p.add_argument("--out", default=None)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--stack", default=None, help="Filter suites by stack id")
+    p.add_argument("--with-reports", action="store_true", help="Run kind=report suites after tests")
     p.add_argument("--timeout", type=int, default=1800)
     p.add_argument("--allow-failures", action="store_true")
     p.set_defaults(func=cmd_run)
@@ -1793,6 +2237,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mutation", default=None)
     p.add_argument("--validation", default=None)
     p.add_argument("--baseline", type=float, default=None, help="Baseline line coverage (0-1)")
+    p.add_argument("--allow-missing-reports", action="store_true", help="Do not fail on missing coverage/mutation reports")
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_gate)
 
@@ -1803,6 +2248,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--matrix", default=None)
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("mcp", help="Run a stdio MCP server")
+    p.add_argument("--allow-write", action="store_true", help="Allow write tools (run/scaffold/export/prompt)")
+    p.set_defaults(func=cmd_mcp)
+
+    p = sub.add_parser("prompt", help="Compose a stage prompt with pack partials")
+    p.add_argument("--stack", required=True)
+    p.add_argument("--stage", required=True)
+    p.add_argument("--out", default=None)
+    p.add_argument("--config", default=DEFAULT_CONFIG_NAME)
+    p.set_defaults(func=cmd_prompt)
 
     p = sub.add_parser("doctor", help="Check environment and config")
     p.add_argument("--config", default=DEFAULT_CONFIG_NAME)

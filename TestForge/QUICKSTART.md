@@ -4,6 +4,29 @@
 
 - Python 3.8+
 - 可选：Node 18+（Playwright）、Docling（PDF 解析）、openpyxl（Excel 导出）
+- 可选：Maven/JDK、CMake/编译器、Docker（对应 pack 的验收）
+
+## 0. 选择场景包
+
+```bash
+python testforge/testforge.py init --list-packs
+```
+
+| Pack | 适用 |
+|---|---|
+| `python-service` | Python API/服务 |
+| `java-service` | Java/Spring 服务 |
+| `cpp-cli` | C++ 客户端/CLI |
+| `frontend-web` | Web 前端（批次 1 骨架） |
+| `k8s` | Kubernetes/集群（批次 1 骨架） |
+
+先 dry-run 看组合：
+
+```bash
+python testforge/testforge.py init --stack python-service --target . --dry-run
+python testforge/testforge.py init --profile platform --target . --dry-run
+python testforge/testforge.py init --detect --target . --dry-run
+```
 
 ## 1. 安装到你的项目
 
@@ -18,6 +41,11 @@ python D:\AI世界\4.Claude世界\1.调研\1.用例生成和自动化测试\Test
 ```bash
 # macOS / Linux
 python /path/to/TestForge/testforge.py init --target ./your-project --profile platform --with-ci
+
+# 单场景
+python /path/to/TestForge/testforge.py init --target ./your-project --stack python-service
+python /path/to/TestForge/testforge.py init --target ./your-project --stack java-service
+python /path/to/TestForge/testforge.py init --target ./your-project --stack cpp-cli
 ```
 
 ## 2. 体检
@@ -33,19 +61,19 @@ python testforge/testforge.py doctor
 
 ```json
 {
-  "inputs": {
-    "docs": ["docs/**/*.md", "requirements/**/*.pdf"],
-    "api": ["openapi/**/*.yaml"],
-    "code": ["src/**/*.py"],
-    "tests": ["tests/**/*.py"]
-  },
-  "commands": {
-    "unit": "pytest -q",
-    "api": "pytest tests/api -q",
-    "e2e": "npx playwright test"
-  }
+  "project": { "name": "my-project", "type": "service", "root": "." },
+  "stacks": [
+    {
+      "id": "api",
+      "pack": "python-service",
+      "root": ".",
+      "commands": { "unit": "uv run pytest -q" }
+    }
+  ]
 }
 ```
+
+多 stack 时每个 stack 有自己的 `root`、`pack`、`commands`；`init` 会生成 `.testforge/run-manifest.json`，每个 stack 一个 suite。
 
 ## 4. 打包上下文
 

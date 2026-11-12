@@ -17,6 +17,15 @@
 > **自动化程度**：`testforge.py gate` 会自动检查 `ac_coverage`、`duplicate_similarity`、`line_coverage`、`line_coverage_delta`、`mutation_score`、`flaky_rate`、`cases_count`。  
 > **需人工/外部统计**：技术覆盖率、可执行率、人工采纳率、单用例成本；这些指标用于复盘，不由脚本自动判定。
 
+## 多 stack 门禁
+
+- 每个 stack 的 `coverage.report` / `mutation.report` 相对 **stack root** 解析。
+- `coverage.parser` 支持 `coverage.py|jacoco|lcov|cobertura|istanbul|gcovr|none`。
+- `mutation.parser` 支持 `json|pit-xml|stryker-json|mutmut|none`。
+- `parser: "none"` → `not_applicable`，不失败。
+- parser 存在但报告缺失 → 默认 **fail**；加 `--allow-missing-reports` 降级为 warning。
+- `gate-report.json` 的 `stacks` 字段包含每个 stack 的 suite 汇总。
+
 ## flaky 检测
 
 在 `run-manifest.json` 给套件加 `reruns`：

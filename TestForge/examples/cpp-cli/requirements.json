@@ -1,0 +1,7 @@
+{
+  "requirements": [
+    { "ac_id": "AC-001", "text": "calc::add(a, b) 返回 a + b。" },
+    { "ac_id": "AC-002", "text": "CLI 参数数量不是 2 时退出码为 2，stderr 包含 usage。" },
+    { "ac_id": "AC-003", "text": "CLI 参数不是整数时退出码为 2，stderr 包含 invalid integer。" }
+  ]
+}

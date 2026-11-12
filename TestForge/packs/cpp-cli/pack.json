@@ -1,0 +1,57 @@
+{
+  "id": "cpp-cli",
+  "display_name": "C++ CLI",
+  "version": "1.0.0",
+  "detect": {
+    "files": ["CMakeLists.txt", "meson.build", "BUILD.bazel"],
+    "globs": ["**/*.cpp", "**/*.cc", "**/*.hpp"],
+    "priority": 10
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "requirements/**/*.pdf", "README.md"],
+    "api": ["docs/api/**/*.md", "docs/api/**/*.yaml"],
+    "code": ["src/**/*.cpp", "src/**/*.cc", "include/**/*.hpp", "include/**/*.h"],
+    "tests": ["tests/**/*.cpp", "tests/**/*.cc"]
+  },
+  "tools": [
+    { "name": "cmake", "command": "cmake --version", "required": true, "install": "https://cmake.org/download/" },
+    { "name": "ctest", "command": "ctest --version", "required": true, "install": "bundled with CMake" },
+    { "name": "compiler", "command": "c++ --version", "required": true, "install": "MSVC / GCC / Clang" },
+    { "name": "lcov", "command": "lcov --version", "required": false, "install": "apt install lcov / brew install lcov" },
+    { "name": "gcovr", "command": "gcovr --version", "required": false, "install": "pip install gcovr" },
+    { "name": "mull", "command": "mull-runner --version", "required": false, "install": "https://mull.readthedocs.io/" }
+  ],
+  "commands": {
+    "configure": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    "build": "cmake --build build -j",
+    "unit": "ctest --test-dir build --output-on-failure",
+    "coverage": "cmake --build build --target coverage",
+    "mutation": "mull-runner"
+  },
+  "coverage": { "parser": "lcov", "report": "build/coverage.info" },
+  "mutation": { "tool": "mull", "parser": "json", "report": "mull-report.json", "score_key": "mutation_score" },
+  "templates": [
+    { "id": "gtest", "path": "templates/gtest_test.cpp", "target": "tests/generated/${module}_test.cpp" },
+    { "id": "catch2", "path": "templates/catch2_test.cpp", "target": "tests/generated/${module}_catch2_test.cpp" },
+    { "id": "cmake", "path": "templates/CMakeLists.test.cmake", "target": "tests/generated/CMakeLists.txt" },
+    { "id": "mull", "path": "templates/mull.yml", "target": "mull.yml" },
+    { "id": "fuzztest", "path": "templates/fuzztest.cpp", "target": "tests/generated/fuzztest_scaffold.cpp" },
+    { "id": "rapidcheck", "path": "templates/rapidcheck_test.cpp", "target": "tests/generated/rapidcheck_scaffold.cpp" },
+    { "id": "approvaltests", "path": "templates/approvaltests_test.cpp", "target": "tests/generated/approvaltests_scaffold.cpp" },
+    { "id": "cli11", "path": "templates/cli11_test.cpp", "target": "tests/generated/cli11_scaffold.cpp" }
+  ],
+  "scaffold": {
+    "default_template": "gtest",
+    "by_type": {
+      "functional": "gtest",
+      "negative": "gtest",
+      "boundary": "gtest",
+      "permission": "gtest"
+    }
+  },
+  "prompt_partials": ["partials/cpp.md"],
+  "adapters": ["adapters/utbotcpp.md", "adapters/citywalk.md", "adapters/unittest-generator-mcp.md", "adapters/cpp-utgen.md", "adapters/testcontainers-native.md"],
+  "ci": ["ci/github-actions-cpp.yml", "ci/gitlab-cpp.yml"],
+  "acceptance": "acceptance.md",
+  "requires": ["cmake>=3.20", "c++20", "gtest"]
+}

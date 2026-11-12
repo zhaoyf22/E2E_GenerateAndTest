@@ -1,0 +1,36 @@
+{
+  "id": "k8s",
+  "display_name": "Kubernetes",
+  "version": "0.1.0-stub",
+  "detect": {
+    "files": ["Chart.yaml", "kustomization.yaml", "chainsaw-test.yaml", "testworkflow.yaml"],
+    "globs": ["**/*.yaml", "**/*.yml"],
+    "priority": 5
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md"],
+    "api": ["openapi.yaml", "openapi.yml"],
+    "code": ["deploy/**/*.yaml", "manifests/**/*.yaml", "charts/**/*.yaml"],
+    "tests": ["tests/**/*.yaml", "e2e/**/*.yaml"]
+  },
+  "tools": [
+    { "name": "kubectl", "command": "kubectl version --client", "required": true, "install": "https://kubernetes.io/docs/tasks/tools/" },
+    { "name": "chainsaw", "command": "chainsaw version", "required": false, "install": "https://kyverno.github.io/chainsaw/" },
+    { "name": "testkube", "command": "kubectl testkube version", "required": false, "install": "https://testkube.io/" },
+    { "name": "helm", "command": "helm version", "required": false, "install": "https://helm.sh/" }
+  ],
+  "commands": {
+    "e2e": "chainsaw test",
+    "orchestrate": "kubectl testkube run testworkflow <name>",
+    "chaos": "kubectl apply -f chaos/"
+  },
+  "coverage": { "parser": "none" },
+  "mutation": { "parser": "none" },
+  "templates": [],
+  "scaffold": { "default_template": "chainsaw" },
+  "prompt_partials": ["partials/k8s.md"],
+  "adapters": [],
+  "ci": [],
+  "acceptance": "acceptance.md",
+  "requires": ["kubectl", "chainsaw"]
+}

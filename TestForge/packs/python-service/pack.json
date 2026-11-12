@@ -1,0 +1,53 @@
+{
+  "id": "python-service",
+  "display_name": "Python Service",
+  "version": "1.0.0",
+  "detect": {
+    "files": ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg"],
+    "globs": ["**/*.py"],
+    "priority": 10
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "requirements/**/*.pdf", "PRD.md", "REQUIREMENTS.md", "requirements.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml", "openapi/**/*.yml", "openapi/**/*.json", "api/**/*.yaml"],
+    "code": ["src/**/*.py", "app/**/*.py"],
+    "tests": ["tests/**/*.py"]
+  },
+  "tools": [
+    { "name": "python", "command": "python --version", "required": true, "install": "https://www.python.org/downloads/" },
+    { "name": "pytest", "command": "pytest --version", "required": true, "install": "pip install pytest" },
+    { "name": "coverage", "command": "coverage --version", "required": false, "install": "pip install coverage" },
+    { "name": "mutmut", "command": "mutmut --version", "required": false, "install": "pip install mutmut" },
+    { "name": "uv", "command": "uv --version", "required": false, "install": "pip install uv" }
+  ],
+  "commands": {
+    "unit": "pytest -q",
+    "api": "pytest tests/api -q",
+    "coverage": "pytest --cov=src --cov-report=json:coverage.json",
+    "mutation": "mutmut run"
+  },
+  "coverage": { "parser": "coverage.py", "report": "coverage.json" },
+  "mutation": { "tool": "mutmut", "parser": "mutmut", "report": "mutation-report.json", "score_key": "mutation_score" },
+  "templates": [
+    { "id": "pytest", "path": "templates/pytest_test.py", "target": "tests/test_${module}.py" },
+    { "id": "conftest", "path": "templates/conftest.py", "target": "tests/conftest.py" },
+    { "id": "testcontainers", "path": "templates/testcontainers_test.py", "target": "tests/integration/test_${module}_container.py" },
+    { "id": "schemathesis", "path": "templates/schemathesis_test.py", "target": "tests/contract/test_openapi.py" },
+    { "id": "hypothesis", "path": "templates/hypothesis_test.py", "target": "tests/property/test_${module}_property.py" }
+  ],
+  "scaffold": {
+    "default_template": "pytest",
+    "by_type": {
+      "functional": "pytest",
+      "negative": "pytest",
+      "boundary": "pytest",
+      "integration": "testcontainers",
+      "contract": "schemathesis"
+    }
+  },
+  "prompt_partials": ["partials/python.md"],
+  "adapters": ["adapters/qodo-cover.md", "adapters/pynguin.md", "adapters/mutahunter.md"],
+  "ci": ["ci/github-actions-python.yml", "ci/gitlab-python.yml"],
+  "acceptance": "acceptance.md",
+  "requires": ["python>=3.10", "pytest", "coverage"]
+}

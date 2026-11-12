@@ -1,0 +1,39 @@
+name: testforge-python
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then pip install -e ".[test]" || pip install -e .; fi
+          pip install pytest pytest-cov
+      - name: Validate cases
+        run: |
+          if [ -f .testforge/cases/test-cases.json ]; then
+            python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
+          fi
+      - name: Test + coverage
+        run: pytest -q --cov=src --cov-branch --cov-report=json:coverage.json
+      - name: Gate
+        run: |
+          python testforge/testforge.py gate --results .testforge/runs/run-results.json --coverage coverage.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testforge-python
+          path: |
+            coverage.json
+            .testforge/reports/
+          if-no-files-found: ignore

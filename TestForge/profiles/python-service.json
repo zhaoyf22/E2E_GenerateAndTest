@@ -1,0 +1,10 @@
+{
+  "id": "python-service",
+  "stacks": [
+    {
+      "id": "api",
+      "pack": "python-service",
+      "root": "."
+    }
+  ]
+}

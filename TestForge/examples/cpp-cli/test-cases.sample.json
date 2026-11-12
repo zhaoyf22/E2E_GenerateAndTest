@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "project": "testforge-cpp-example",
+    "generated_at": "2026-11-12T00:00:00+00:00",
+    "assumptions": ["CMake and GoogleTest are available"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-CALC-001",
+      "title": "add(2, 3) 返回 5",
+      "ac_ids": ["AC-001"],
+      "stack_id": "cli",
+      "pack": "cpp-cli",
+      "source_refs": ["examples/cpp-cli/src/calc.cpp:4-6"],
+      "technique": "scenario",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": ["calc 库可链接"],
+      "steps": [
+        {"action": "调用 calc::add(2, 3)", "data": "a=2,b=3", "expected": "返回 5"}
+      ],
+      "test_data": {"a": 2, "b": 3},
+      "expected_result": "返回 5",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "gtest", "file": "tests/test_calc.cpp"}
+    },
+    {
+      "id": "TC-CLI-002",
+      "title": "缺少参数时退出码 2 并打印 usage",
+      "ac_ids": ["AC-002"],
+      "stack_id": "cli",
+      "pack": "cpp-cli",
+      "source_refs": ["examples/cpp-cli/src/main.cpp:6-9"],
+      "technique": "error-guessing",
+      "priority": "P1",
+      "type": "negative",
+      "preconditions": ["app 可执行文件已构建"],
+      "steps": [
+        {"action": "执行 app 1", "data": "argc=2", "expected": "退出码 2，stderr 包含 usage"}
+      ],
+      "test_data": {"args": ["1"]},
+      "expected_result": "退出码 2，stderr 包含 usage",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "ctest", "file": "tests/test_cli.cpp"}
+    },
+    {
+      "id": "TC-CLI-003",
+      "title": "非整数参数时退出码 2 并打印 invalid integer",
+      "ac_ids": ["AC-003"],
+      "stack_id": "cli",
+      "pack": "cpp-cli",
+      "source_refs": ["examples/cpp-cli/src/main.cpp:10-17"],
+      "technique": "EP",
+      "priority": "P1",
+      "type": "negative",
+      "preconditions": ["app 可执行文件已构建"],
+      "steps": [
+        {"action": "执行 app abc 1", "data": "args=[abc,1]", "expected": "退出码 2，stderr 包含 invalid integer"}
+      ],
+      "test_data": {"args": ["abc", "1"]},
+      "expected_result": "退出码 2，stderr 包含 invalid integer",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "ctest", "file": "tests/test_cli.cpp"}
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-CALC-001"],
+    "AC-002": ["TC-CLI-002"],
+    "AC-003": ["TC-CLI-003"]
+  },
+  "gap_list": [],
+  "self_check": {"missing": [], "duplicates": [], "unexecutable": [], "unsupported_expectations": []}
+}

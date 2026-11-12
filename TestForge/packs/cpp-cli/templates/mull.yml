@@ -1,0 +1,11 @@
+# Mull mutation testing configuration (minimal).
+# Docs: https://mull.readthedocs.io/
+mutators:
+  - cxx_arithmetic
+  - cxx_comparison
+  - cxx_logical
+  - cxx_boundary
+  - cxx_remove_negation
+  - cxx_replace_scalar_call
+timeout: 300
+workers: 4

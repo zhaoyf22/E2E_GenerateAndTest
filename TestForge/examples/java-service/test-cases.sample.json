@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "project": "testforge-java-example",
+    "generated_at": "2026-11-12T00:00:00+00:00",
+    "assumptions": ["Maven and JDK 17+ are installed"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-ORDER-001",
+      "title": "价格 100、数量 3 时总价为 300",
+      "ac_ids": ["AC-001"],
+      "stack_id": "svc",
+      "pack": "java-service",
+      "source_refs": ["examples/java-service/src/main/java/com/example/OrderService.java:5-11"],
+      "technique": "EP",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": ["OrderService 可实例化"],
+      "steps": [
+        {"action": "调用 total(100, 3)", "data": "price=100, quantity=3", "expected": "返回 300"}
+      ],
+      "test_data": {"price": 100, "quantity": 3},
+      "expected_result": "返回 300",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "junit5", "file": "src/test/java/com/example/OrderServiceTest.java"}
+    },
+    {
+      "id": "TC-ORDER-002",
+      "title": "数量为 0 时抛出 IllegalArgumentException",
+      "ac_ids": ["AC-002"],
+      "stack_id": "svc",
+      "pack": "java-service",
+      "source_refs": ["examples/java-service/src/main/java/com/example/OrderService.java:5-11"],
+      "technique": "BVA",
+      "priority": "P0",
+      "type": "negative",
+      "preconditions": ["OrderService 可实例化"],
+      "steps": [
+        {"action": "调用 total(100, 0)", "data": "price=100, quantity=0", "expected": "抛出 IllegalArgumentException"}
+      ],
+      "test_data": {"price": 100, "quantity": 0},
+      "expected_result": "抛出 IllegalArgumentException",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "junit5", "file": "src/test/java/com/example/OrderServiceTest.java"}
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-ORDER-001"],
+    "AC-002": ["TC-ORDER-002"]
+  },
+  "gap_list": [],
+  "self_check": {"missing": [], "duplicates": [], "unexecutable": [], "unsupported_expectations": []}
+}

@@ -1,0 +1,51 @@
+{
+  "id": "java-service",
+  "display_name": "Java Service",
+  "version": "1.0.0",
+  "detect": {
+    "files": ["pom.xml", "build.gradle", "build.gradle.kts"],
+    "globs": ["**/*.java"],
+    "priority": 10
+  },
+  "inputs": {
+    "docs": ["docs/**/*.md", "requirements/**/*.md", "requirements/**/*.txt", "requirements/**/*.pdf", "PRD.md", "REQUIREMENTS.md"],
+    "api": ["openapi.yaml", "openapi.yml", "openapi.json", "openapi/**/*.yaml", "openapi/**/*.yml", "openapi/**/*.json"],
+    "code": ["src/main/java/**/*.java"],
+    "tests": ["src/test/java/**/*.java"]
+  },
+  "tools": [
+    { "name": "java", "command": "java -version", "required": true, "install": "https://adoptium.net/" },
+    { "name": "maven", "command": "mvn -version", "required": true, "install": "https://maven.apache.org/download.cgi" },
+    { "name": "gradle", "command": "gradle --version", "required": false, "install": "https://gradle.org/install/" },
+    { "name": "docker", "command": "docker --version", "required": false, "install": "https://docs.docker.com/get-docker/" }
+  ],
+  "commands": {
+    "unit": "mvn -q test",
+    "integration": "mvn -q verify -Pintegration",
+    "coverage": "mvn -q test jacoco:report",
+    "mutation": "mvn -q org.pitest:pitest-maven:mutationCoverage"
+  },
+  "coverage": { "parser": "jacoco", "report": "target/site/jacoco/jacoco.xml" },
+  "mutation": { "tool": "pitest", "parser": "pit-xml", "report": "target/pit-reports/mutations.xml", "score_key": "mutation_score" },
+  "templates": [
+    { "id": "junit5", "path": "templates/JUnit5Test.java", "target": "src/test/java/com/example/Generated_${module}Test.java" },
+    { "id": "testcontainers", "path": "templates/TestcontainersTest.java", "target": "src/test/java/com/example/Generated_${module}TestcontainersTest.java" },
+    { "id": "wiremock", "path": "templates/WireMockTest.java", "target": "src/test/java/com/example/Generated_${module}WireMockTest.java" },
+    { "id": "restassured", "path": "templates/RestAssuredTest.java", "target": "src/test/java/com/example/Generated_${module}RestAssuredTest.java" }
+  ],
+  "scaffold": {
+    "default_template": "junit5",
+    "by_type": {
+      "functional": "junit5",
+      "negative": "junit5",
+      "boundary": "junit5",
+      "integration": "testcontainers",
+      "contract": "restassured"
+    }
+  },
+  "prompt_partials": ["partials/java.md"],
+  "adapters": ["adapters/testagent.md", "adapters/testspark.md", "adapters/pit.md", "adapters/jqwik.md", "adapters/jazzer.md"],
+  "ci": ["ci/github-actions-java.yml", "ci/gitlab-java.yml"],
+  "acceptance": "acceptance.md",
+  "requires": ["java>=17", "maven", "junit5"]
+}

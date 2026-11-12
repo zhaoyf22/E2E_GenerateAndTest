@@ -1,0 +1,10 @@
+{
+  "id": "web",
+  "stacks": [
+    {
+      "id": "web",
+      "pack": "frontend-web",
+      "root": "."
+    }
+  ]
+}

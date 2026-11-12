@@ -1,0 +1,6 @@
+{
+  "requirements": [
+    { "ac_id": "AC-001", "text": "add(a, b) 返回两个整数之和。" },
+    { "ac_id": "AC-002", "text": "is_adult(age) 在 age >= 18 时返回 True，17 返回 False，负数抛出 ValueError。" }
+  ]
+}

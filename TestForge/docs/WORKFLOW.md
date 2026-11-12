@@ -1,9 +1,13 @@
 # 工作流
 
-## 0. 安装
+## 0. 选择 pack 并安装
 
 ```bash
+python TestForge/testforge.py init --list-packs
 python TestForge/testforge.py init --target D:\path\to\project --profile platform --with-ci
+# 或单场景
+python TestForge/testforge.py init --target D:\path\to\project --stack python-service
+python TestForge/testforge.py init --target D:\path\to\project --detect --dry-run
 cd D:\path\to\project
 python testforge/testforge.py doctor
 ```
@@ -12,11 +16,13 @@ python testforge/testforge.py doctor
 
 编辑 `testforge.config.json`：
 
-- `inputs.docs/api/code/tests`：你的真实路径；
-- `stack`：语言/框架/DB；
-- `commands`：unit/api/e2e/coverage/mutation；
-- `quality_gates`：阈值；
-- `paths.coverage_report`：覆盖率报告路径。
+- `stacks[]`：每个 stack 的 `id`、`pack`、`root`；
+- `stacks[].inputs.docs/api/code/tests`：该 stack 的真实路径；
+- `stacks[].commands`：unit/integration/api/e2e/coverage/mutation；
+- `quality_gates`：全局阈值；
+- `stacks[].coverage/mutation`：报告路径与解析器。
+
+`init` 会为每个 stack 生成 `.testforge/run-manifest.json` 的 test/report suites；`coverage`/`mutation` 默认不跑，`run --with-reports` 才跑。
 
 ## 2. 打包上下文
 

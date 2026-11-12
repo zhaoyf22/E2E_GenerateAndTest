@@ -1,0 +1,6 @@
+{
+  "requirements": [
+    { "ac_id": "AC-001", "text": "total(price, quantity) 返回 price * quantity。" },
+    { "ac_id": "AC-002", "text": "price < 0 或 quantity < 1 时抛出 IllegalArgumentException。" }
+  ]
+}

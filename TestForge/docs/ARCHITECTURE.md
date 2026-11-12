@@ -1,5 +1,17 @@
 # 架构
 
+## 通用内核 + 场景包
+
+```text
+core/                  语言无关：config / packs / detect / scaffold
+                       export_formats / mcp / prompt
+packs/<pack>/          pack.json + templates + partials + adapters + ci + acceptance
+profiles/<name>.json   stacks + surfaces 组合
+testforge.config.json  stacks[]（每个 stack 一个 pack + root + commands）
+```
+
+内核不 import Java/Python/C++ 工具；pack 拥有命令、覆盖率/变异解析、模板、prompt partial、CI、验收。`init` 负责组合，`pack/validate/matrix/run/gate/report` 按 stack 工作。
+
 ## 分层
 
 ```text

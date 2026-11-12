@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "project": "testforge-python-example",
+    "generated_at": "2026-11-12T00:00:00+00:00",
+    "assumptions": ["pytest is installed"]
+  },
+  "test_cases": [
+    {
+      "id": "TC-ADD-001",
+      "title": "两个正整数相加返回它们的和",
+      "ac_ids": ["AC-001"],
+      "stack_id": "api",
+      "pack": "python-service",
+      "source_refs": ["examples/python-service/src/app.py:1-3"],
+      "technique": "scenario",
+      "priority": "P0",
+      "type": "functional",
+      "preconditions": ["app.py 可导入"],
+      "steps": [
+        {"action": "调用 add(2, 3)", "data": "a=2,b=3", "expected": "返回 5"}
+      ],
+      "test_data": {"a": 2, "b": 3},
+      "expected_result": "返回 5",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "pytest", "file": "tests/test_app.py"}
+    },
+    {
+      "id": "TC-ADULT-002",
+      "title": "年龄 17 返回 False，18 返回 True",
+      "ac_ids": ["AC-002"],
+      "stack_id": "api",
+      "pack": "python-service",
+      "source_refs": ["examples/python-service/src/app.py:6-11"],
+      "technique": "BVA",
+      "priority": "P1",
+      "type": "boundary",
+      "preconditions": ["app.py 可导入"],
+      "steps": [
+        {"action": "调用 is_adult(17)", "data": "17", "expected": "返回 False"},
+        {"action": "调用 is_adult(18)", "data": "18", "expected": "返回 True"}
+      ],
+      "test_data": {"age": [17, 18]},
+      "expected_result": "17 为 False，18 为 True",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "pytest", "file": "tests/test_app.py"}
+    },
+    {
+      "id": "TC-ADULT-003",
+      "title": "负数年龄抛出 ValueError",
+      "ac_ids": ["AC-002"],
+      "stack_id": "api",
+      "pack": "python-service",
+      "source_refs": ["examples/python-service/src/app.py:6-11"],
+      "technique": "EP",
+      "priority": "P1",
+      "type": "negative",
+      "preconditions": ["app.py 可导入"],
+      "steps": [
+        {"action": "调用 is_adult(-1)", "data": "-1", "expected": "抛出 ValueError"}
+      ],
+      "test_data": {"age": -1},
+      "expected_result": "抛出 ValueError，消息为 age must be >= 0",
+      "postconditions": [],
+      "automatable": true,
+      "automation": {"framework": "pytest", "file": "tests/test_app.py"}
+    }
+  ],
+  "coverage_matrix": {
+    "AC-001": ["TC-ADD-001"],
+    "AC-002": ["TC-ADULT-002", "TC-ADULT-003"]
+  },
+  "gap_list": [],
+  "self_check": {
+    "missing": [],
+    "duplicates": [],
+    "unexecutable": [],
+    "unsupported_expectations": []
+  }
+}
