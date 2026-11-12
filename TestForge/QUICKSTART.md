@@ -48,7 +48,7 @@ python /path/to/TestForge/testforge.py init --target ./your-project --stack java
 python /path/to/TestForge/testforge.py init --target ./your-project --stack cpp-cli
 ```
 
-`--with-ci` 会把所选 stack/pack 的 CI 模板安装到 `.github/workflows/`（GitLab 模板写到 `.gitlab-ci.<pack>.yml`）；pack 模板已包含 `run`（生成 run-results）和阻断式 `gate`，不再用 `|| true` 吞掉门禁失败。
+`--with-ci` 会按 stack 安装 CI 模板：GitHub 写到 `.github/workflows/testforge-<stack>.yml`，GitLab 写到 `.gitlab-ci.<stack>.yml`（需要在 `.gitlab-ci.yml` 里 include）。每个 job 只用 `--stack <id>` 运行本 stack 的 suite 和门禁，不会执行其他 stack 的工具链。模板包含 `run`（生成 run-results）和阻断式 `gate`；覆盖率/变异报告按项目实际配置启用，模板默认用 `--allow-missing-reports`，配置好 mutmut、JaCoCo、PIT、Mull 后应去掉该参数。
 
 ## 2. 体检
 

@@ -339,33 +339,42 @@ def _legacy_pack_choice(project_type: str, target: Path, packs: Dict[str, Any]) 
 
 
 def _install_pack_ci(target: Path, packs: Dict[str, Any], config: Dict[str, Any]) -> None:
-    copied: List[Path] = []
-    seen_packs: set = set()
-    for stack in as_list(config.get("stacks")):
-        pack_id = str(as_dict(stack).get("pack") or "")
-        if not pack_id or pack_id in seen_packs:
-            continue
-        seen_packs.add(pack_id)
-        pack = packs.get(pack_id)
-        if pack is None:
-            continue
-        for relative in pack.ci:
-            source = pack.path / relative
-            if not source.is_file():
+    stacks = [as_dict(stack) for stack in as_list(config.get("stacks"))]
+    if stacks:
+        wrote_gitlab = False
+        for stack in stacks:
+            pack_id = str(stack.get("pack") or "")
+            stack_id = str(stack.get("id") or pack_id or "default")
+            file_id = slugify(stack_id)
+            pack = packs.get(pack_id)
+            if pack is None:
                 continue
-            filename = source.name
-            if filename.startswith("github-actions"):
-                destination = target / ".github" / "workflows" / f"testforge-{pack_id}.yml"
-            elif filename.startswith("gitlab"):
-                destination = target / f".gitlab-ci.{pack_id}.yml"
-            else:
-                destination = target / ".github" / "workflows" / filename
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-            copied.append(destination)
-            print(f"Wrote CI: {destination}")
-    if copied:
+            if not pack.ci:
+                print(f"No CI template for pack '{pack_id}' (stack '{stack_id}' skipped)")
+                continue
+            for relative in pack.ci:
+                source = pack.path / relative
+                if not source.is_file():
+                    continue
+                # The template is scoped to this stack: run/gate only run this
+                # stack's suites, so multi-stack projects do not execute other
+                # toolchains in every job.
+                text = source.read_text(encoding="utf-8").replace("__STACK_ID__", stack_id)
+                filename = source.name
+                if filename.startswith("github-actions"):
+                    destination = target / ".github" / "workflows" / f"testforge-{file_id}.yml"
+                elif filename.startswith("gitlab"):
+                    destination = target / f".gitlab-ci.{file_id}.yml"
+                    wrote_gitlab = True
+                else:
+                    destination = target / ".github" / "workflows" / filename
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(text, encoding="utf-8", newline="\n")
+                print(f"Wrote CI: {destination}")
+        if wrote_gitlab:
+            print("GitLab: include the generated .gitlab-ci.<stack>.yml files from .gitlab-ci.yml")
         return
+    # Legacy config (no explicit stacks): keep the single generic template.
     generic = SUITE_ROOT / "ci" / "github-actions.yml"
     if generic.is_file():
         destination = target / ".github" / "workflows" / "testforge.yml"
@@ -622,8 +631,8 @@ def cmd_pack(args: argparse.Namespace) -> int:
     try:
         packs = load_packs(SUITE_ROOT / "packs")
         stacks = normalize_stacks(config, packs)
-    except Exception:
-        stacks = []
+    except Exception as exc:
+        raise SystemExit(f"Invalid stack config: {exc}")
     explicit_stacks = isinstance(config.get("stacks"), list) and bool(config.get("stacks"))
     if not stacks:
         stacks = [{"id": "default", "pack": "", "root": "."}]
@@ -1297,7 +1306,19 @@ def cmd_matrix(args: argparse.Namespace) -> int:
         stacks = normalize_stacks(config, packs)
     except Exception:
         stacks = []
-    stack_ids = [str(stack.get("id") or "default") for stack in stacks] or ["default"]
+    explicit_stacks = isinstance(config.get("stacks"), list) and bool(config.get("stacks"))
+    if explicit_stacks:
+        stack_ids = [str(stack.get("id") or "default") for stack in stacks] or ["default"]
+    else:
+        # No explicit stack config: use the stack ids actually present in the
+        # cases, so a hand-written case tagged "api" does not gain a phantom
+        # "default" column on top of it.
+        observed: List[str] = []
+        for case in cases:
+            sid = str(case.get("stack_id") or "default")
+            if sid not in observed:
+                observed.append(sid)
+        stack_ids = observed or ["default"]
 
     stack_filter = getattr(args, "stack", None)
     if stack_filter:
@@ -1996,8 +2017,14 @@ def cmd_gate(args: argparse.Namespace) -> int:
     try:
         packs = load_packs(SUITE_ROOT / "packs")
         stacks = normalize_stacks(config, packs)
-    except Exception:
-        stacks = []
+    except Exception as exc:
+        raise SystemExit(f"Invalid stack config: {exc}")
+    stack_filter = getattr(args, "stack", None)
+    if stack_filter:
+        stacks = [s for s in stacks if str(s.get("id") or "default") == stack_filter]
+        if not stacks:
+            available = ", ".join(str(s.get("id") or "default") for s in normalize_stacks(config, packs))
+            raise SystemExit(f"Unknown stack: {stack_filter} (available: {available})")
     project_base = project_root(config, str(config_file)) if has_config else Path.cwd()
     explicit_stacks = isinstance(config.get("stacks"), list) and bool(config.get("stacks"))
     allow_missing = bool(getattr(args, "allow_missing_reports", False))
@@ -2108,12 +2135,25 @@ def cmd_gate(args: argparse.Namespace) -> int:
         stack_outcomes[stack_id] = outcome
 
     suites = as_list(results.get("suites"))
+    if stack_filter:
+        suites = [s for s in suites if str(s.get("stack_id") or "default") == stack_filter]
     bad = [
         s for s in suites
         if s.get("status") not in ("passed", "dry-run", "skipped") and not s.get("allow_failure")
     ]
     add("suites_passed", len(suites) - len(bad), len(suites), not bad,
         "failed: " + ", ".join(s.get("name", "?") for s in bad) if bad else "all passed")
+    # A stack must not report passed when its own suites failed.
+    for stack_id, outcome in stack_outcomes.items():
+        failed = [
+            s for s in suites
+            if str(s.get("stack_id") or "default") == stack_id
+            and s.get("status") not in ("passed", "dry-run", "skipped")
+            and not s.get("allow_failure")
+        ]
+        if failed:
+            outcome["passed"] = False
+            outcome["failed_suites"] = [s.get("name", "?") for s in failed]
 
     coverage_path = resolve(args.coverage or paths.get("coverage_report"))
     coverage = parse_coverage(coverage_path, str(legacy_coverage.get("parser") or "")) if coverage_path else None
@@ -2603,6 +2643,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--validation", default=None)
     p.add_argument("--baseline", type=float, default=None, help="Baseline line coverage (0-1)")
     p.add_argument("--allow-missing-reports", action="store_true", help="Do not fail on missing coverage/mutation reports")
+    p.add_argument("--stack", default=None, help="Check only this stack id")
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_gate)
 

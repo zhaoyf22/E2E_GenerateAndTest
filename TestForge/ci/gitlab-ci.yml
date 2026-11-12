@@ -7,6 +7,7 @@ testforge:
   timeout: 45m
   before_script:
     - python -m pip install --upgrade pip
+    - pip install pytest pytest-cov
     - if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - if [ -f pyproject.toml ]; then pip install -e .; fi
   script:
@@ -31,11 +32,10 @@ testforge:
         printf '{"suites":[],"summary":{"by_stack":{}}}' > .testforge/runs/run-results.json
       fi
     - |
-      python testforge/testforge.py gate \
-        --results .testforge/runs/run-results.json \
-        --coverage coverage.json \
-        --validation .testforge/reports/validation-report.json \
-        --out .testforge/reports/gate-report.json
+      ARGS="--results .testforge/runs/run-results.json --out .testforge/reports/gate-report.json"
+      if [ -f coverage.json ]; then ARGS="$ARGS --coverage coverage.json"; fi
+      if [ -f .testforge/reports/validation-report.json ]; then ARGS="$ARGS --validation .testforge/reports/validation-report.json"; fi
+      python testforge/testforge.py gate $ARGS --allow-missing-reports
     - |
       python testforge/testforge.py report \
         --results .testforge/runs/run-results.json \

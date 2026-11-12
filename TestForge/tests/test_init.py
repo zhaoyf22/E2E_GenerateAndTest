@@ -118,7 +118,7 @@ class InitTest(unittest.TestCase):
             stack = payload["stacks"][0]
             self.assertEqual(stack["pack"], "python-service")
             self.assertEqual(stack["commands"]["cli-smoke"], "python -m your_cli --help")
-            self.assertEqual(stack["commands"]["unit"], "pytest -q")
+            self.assertEqual(stack["commands"]["unit"], "python -m pytest -q --ignore=testforge")
 
     def test_platform_profile_does_not_merge_legacy_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -150,13 +150,34 @@ class InitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             proc = run_init("--profile", "python-service", "--target", tmp, "--with-ci")
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            workflow = Path(tmp) / ".github" / "workflows" / "testforge-python-service.yml"
-            self.assertTrue(workflow.is_file())
-            text = workflow.read_text(encoding="utf-8")
+            workflows = list((Path(tmp) / ".github" / "workflows").glob("testforge-*.yml"))
+            self.assertEqual(len(workflows), 1)
+            text = workflows[0].read_text(encoding="utf-8")
             self.assertIn("actions/setup-python", text)
             self.assertIn("Run manifest", text)
+            self.assertIn("--stack ", text)
+            self.assertNotIn("__STACK_ID__", text)
+            self.assertIn("--allow-missing-reports", text)
             self.assertIn("testforge.py gate", text)
             self.assertNotIn("|| true", text)
+
+    def test_with_ci_scopes_each_stack_workflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = run_init(
+                "--target", tmp, "--with-ci",
+                "--stack", "python-service:services/api",
+                "--stack", "java-service:services/order",
+                "--stack-id", "api", "--stack-id", "svc",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            workflows = Path(tmp) / ".github" / "workflows"
+            api = (workflows / "testforge-api.yml").read_text(encoding="utf-8")
+            svc = (workflows / "testforge-svc.yml").read_text(encoding="utf-8")
+            self.assertIn("--stack api", api)
+            self.assertIn("--stack svc", svc)
+            self.assertNotIn("--stack api", svc)
+            self.assertNotIn("--stack svc", api)
+            self.assertNotIn("__STACK_ID__", api + svc)
 
     def test_run_manifest_cwd_uses_posix_separators(self):
         with tempfile.TemporaryDirectory() as tmp:

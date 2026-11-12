@@ -95,5 +95,26 @@ class StackMatrixTest(unittest.TestCase):
             self.assertEqual(payload["uncovered_by_stack"]["AC-001"], [])
 
 
+    def test_no_config_uses_observed_stack_ids_without_phantom_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            requirements = root / "requirements.json"
+            requirements.write_text(json.dumps([{"ac_id": "AC-001", "text": "first"}]), encoding="utf-8")
+            cases = root / "test-cases.json"
+            cases.write_text(json.dumps({"test_cases": [
+                case("TC-1", "api", "AC-001"),
+            ]}), encoding="utf-8")
+            out = root / "matrix.json"
+            proc = run_cli(
+                "matrix", "--cases", str(cases), "--requirements", str(requirements),
+                "--out", str(out),
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            payload = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(payload["meta"]["stacks"], ["api"])
+            self.assertNotIn("default", payload["matrix_by_stack"]["AC-001"])
+            self.assertEqual(payload["uncovered_by_stack"]["AC-001"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

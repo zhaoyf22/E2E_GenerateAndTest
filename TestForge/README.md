@@ -39,7 +39,7 @@ python testforge.py prompt --stack api --stage 02-test-design
 python testforge.py mcp --allow-write
 ```
 
-MCP 默认只读：`run`/`scaffold`/`export`/`prompt --out` 需要 `--allow-write` 或 `TESTFORGE_MCP_ALLOW_WRITE=1`。`pack`/`validate`/`gate`/`report` 归类为只读工具（不修改源码/测试文件），但仍会写 `context.json`、validation/gate/report 等运行产物；只读不等于“无文件写入”。
+MCP 默认只读：`run`/`scaffold`/`export`/`prompt`（无论是否带 `--out`）需要 `--allow-write` 或 `TESTFORGE_MCP_ALLOW_WRITE=1`。`pack`/`validate`/`gate`/`report` 归类为只读工具（不修改源码/测试文件），但仍会写 `context.json`、validation/gate/report 等运行产物；只读不等于“无文件写入”。
 
 旧的 `--profile platform/service/cli/frontend/backend` 仍然可用，会自动映射到 pack 组合或单 stack。
 
@@ -125,7 +125,7 @@ python testforge/testforge.py export --cases .testforge/cases/test-cases.json --
 
 ### 方式 C：接入 CI
 
-把 `ci/github-actions.yml` 复制为 `.github/workflows/testforge.yml`，修改命令即可。`gate` 会在门禁失败时返回非 0，阻断合并。
+推荐 `init --with-ci`：按 stack 安装 pack 的 CI 模板（GitHub 一个 stack 一个 workflow，GitLab 为 `.gitlab-ci.<stack>.yml`，需在 `.gitlab-ci.yml` 中 include）。每个 job 用 `--stack <id>` 只跑本 stack；`gate` 失败返回非 0，阻断合并。覆盖率/变异工具默认按项目实际配置启用，模板用 `--allow-missing-reports` 容忍未产生的报告；配好 mutmut/JaCoCo/PIT/Mull 后应去掉该参数。也可手动复制 `ci/github-actions.yml` 后修改。
 
 ---
 

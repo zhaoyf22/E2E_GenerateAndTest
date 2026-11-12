@@ -31,17 +31,19 @@ jobs:
         run: |
           lcov --capture --directory build --output-file build/coverage.info --ignore-errors mismatch
           lcov --remove build/coverage.info '/usr/*' --output-file build/coverage.info --ignore-errors unused
-      - name: Mutation (Mull)
-        run: mull-runner build/tests --reporters Elements --report-dir build/mull-report --report-name mutation
+      # Mull mutation testing is optional: install Mull, then add
+      #   mull-runner <your-test-binary> --reporters Elements \
+      #     --report-dir build/mull-report --report-name mutation
+      # and drop --allow-missing-reports from the gate step.
       - name: Validate cases
         run: |
           if [ -f .testforge/cases/test-cases.json ]; then
             python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
           fi
-      - name: Run manifest (record results)
+      - name: Run manifest (stack tests)
         run: |
           if [ -f .testforge/run-manifest.json ]; then
-            python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+            python testforge/testforge.py run --manifest .testforge/run-manifest.json --stack __STACK_ID__ --allow-failures
           else
             echo "No .testforge/run-manifest.json; run testforge.py init first"
             exit 1
@@ -49,7 +51,10 @@ jobs:
       - name: Quality gate
         run: |
           python testforge/testforge.py gate \
+            --stack __STACK_ID__ \
             --results .testforge/runs/run-results.json \
+            --coverage build/coverage.info \
+            --allow-missing-reports \
             --out .testforge/reports/gate-report.json
       - uses: actions/upload-artifact@v4
         if: always()

@@ -82,6 +82,6 @@ python testforge/testforge.py prompt --stack api --stage 02-test-design
 python testforge/testforge.py mcp --allow-write
 ```
 
-MCP 写入授权也可用环境变量 `TESTFORGE_MCP_ALLOW_WRITE=1`。`gate` 在 MCP 中归类为只读工具，但它仍会写 `gate-report.json`；`run`/`scaffold`/`export`/`prompt --out` 必须显式授权。
+MCP 写入授权也可用环境变量 `TESTFORGE_MCP_ALLOW_WRITE=1`。`gate` 在 MCP 中归类为只读工具，但它仍会写 `gate-report.json`；`run`/`scaffold`/`export`/`prompt`（无论是否带 `--out`）必须显式授权。
 
-旧 `--profile platform/service/cli/frontend/backend` 仍可用，会自动映射到 pack 组合或单 stack。显式 stack 的 `gate` 默认要求 pack 声明的覆盖率/变异报告存在；用 `--allow-missing-reports` 才降级为警告。
+旧 `--profile platform/service/cli/frontend/backend` 仍可用，会自动映射到 pack 组合或单 stack。显式 stack 的 `gate` 默认要求 pack 声明的覆盖率/变异报告存在；用 `--allow-missing-reports` 才降级为警告，用 `--stack <id>` 只检查单个 stack。`init --with-ci` 按 stack 生成 CI，GitLab 生成的文件需要 include 到 `.gitlab-ci.yml`。

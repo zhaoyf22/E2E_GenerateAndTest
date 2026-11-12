@@ -3,17 +3,20 @@ testforge-java:
   before_script:
     - apt-get update && apt-get install -y python3
   script:
-    - mvn -q test jacoco:report
-    - mvn -q org.pitest:pitest-maven:mutationCoverage
+    - mvn -q test
+    # JaCoCo/PIT are optional: configure them in pom.xml, then add
+    #   mvn -q test jacoco:report
+    #   mvn -q org.pitest:pitest-maven:mutationCoverage
+    # and pass --coverage target/site/jacoco/jacoco.xml to gate.
     - if [ -f .testforge/cases/test-cases.json ]; then python3 testforge/testforge.py validate --cases .testforge/cases/test-cases.json; fi
     - |
       if [ -f .testforge/run-manifest.json ]; then
-        python3 testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+        python3 testforge/testforge.py run --manifest .testforge/run-manifest.json --stack __STACK_ID__ --allow-failures
       else
         echo "No .testforge/run-manifest.json; run testforge.py init first"
         exit 1
       fi
-    - python3 testforge/testforge.py gate --results .testforge/runs/run-results.json --out .testforge/reports/gate-report.json
+    - python3 testforge/testforge.py gate --stack __STACK_ID__ --results .testforge/runs/run-results.json --allow-missing-reports --out .testforge/reports/gate-report.json
   artifacts:
     when: always
     paths:

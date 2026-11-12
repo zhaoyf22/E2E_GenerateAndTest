@@ -21,9 +21,9 @@
     { "name": "uv", "command": "uv --version", "required": false, "install": "pip install uv" }
   ],
   "commands": {
-    "unit": "pytest -q",
-    "api": "pytest tests/api -q",
-    "coverage": "pytest --cov=src --cov-report=json:coverage.json",
+    "unit": "python -m pytest -q --ignore=testforge",
+    "api": "python -c \"import pathlib,subprocess,sys; d=pathlib.Path('tests/api'); sys.exit(0 if not d.is_dir() else subprocess.call([sys.executable,'-m','pytest','tests/api','-q']))\"",
+    "coverage": "python -m pytest --ignore=testforge --cov --cov-report=json:coverage.json",
     "mutation": "mutmut run && mutmut export-cicd-stats"
   },
   "coverage": { "parser": "coverage.py", "report": "coverage.json" },

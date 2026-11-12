@@ -230,5 +230,63 @@ class RunGateTest(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 
+    def test_gate_stack_filter_checks_only_selected_stack(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = {
+                "project": {"name": "tmp", "type": "platform", "root": "."},
+                "stacks": [
+                    {"id": "api", "pack": "python-service", "root": "."},
+                    {"id": "k8s", "pack": "k8s", "root": "."},
+                ],
+            }
+            config_path = root / "testforge.config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            results_path = root / "run-results.json"
+            results_path.write_text(json.dumps({
+                "suites": [
+                    {"name": "api-unit", "status": "passed", "stack_id": "api"},
+                    {"name": "k8s-e2e", "status": "passed", "stack_id": "k8s"},
+                ],
+            }), encoding="utf-8")
+            proc = run_cli("gate", "--results", str(results_path), "--config", str(config_path))
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            proc = run_cli(
+                "gate", "--results", str(results_path), "--config", str(config_path),
+                "--stack", "k8s",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            report = json.loads((root / "gate-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(list(report["stacks"]), ["k8s"])
+            proc = run_cli(
+                "gate", "--results", str(results_path), "--config", str(config_path),
+                "--stack", "missing",
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("Unknown stack", proc.stderr + proc.stdout)
+
+    def test_stack_outcome_fails_when_its_suite_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = {
+                "project": {"name": "tmp", "type": "service", "root": "."},
+                "stacks": [{"id": "api", "pack": "python-service", "root": "."}],
+            }
+            config_path = root / "testforge.config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            results_path = root / "run-results.json"
+            results_path.write_text(json.dumps({
+                "suites": [{"name": "api-unit", "status": "failed", "stack_id": "api"}],
+            }), encoding="utf-8")
+            proc = run_cli(
+                "gate", "--results", str(results_path), "--config", str(config_path),
+                "--stack", "api", "--allow-missing-reports",
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            report = json.loads((root / "gate-report.json").read_text(encoding="utf-8"))
+            self.assertFalse(report["stacks"]["api"]["passed"])
+            self.assertEqual(report["stacks"]["api"]["failed_suites"], ["api-unit"])
+
+
 if __name__ == "__main__":
     unittest.main()
