@@ -75,11 +75,13 @@ python testforge/testforge.py init --detect --target .
 新增命令：
 
 ```bash
-python testforge/testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack web --out e2e/generated
+python testforge/testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack api --out e2e/generated
 python testforge/testforge.py export --cases .testforge/cases/test-cases.json --format testrail
 python testforge/testforge.py export --cases .testforge/cases/test-cases.json --format xray
 python testforge/testforge.py prompt --stack api --stage 02-test-design
 python testforge/testforge.py mcp --allow-write
 ```
 
-旧 `--profile platform/service/cli/frontend/backend` 仍可用，会自动映射到 pack 组合或单 stack。
+MCP 写入授权也可用环境变量 `TESTFORGE_MCP_ALLOW_WRITE=1`。`gate` 在 MCP 中归类为只读工具，但它仍会写 `gate-report.json`；`run`/`scaffold`/`export`/`prompt --out` 必须显式授权。
+
+旧 `--profile platform/service/cli/frontend/backend` 仍可用，会自动映射到 pack 组合或单 stack。显式 stack 的 `gate` 默认要求 pack 声明的覆盖率/变异报告存在；用 `--allow-missing-reports` 才降级为警告。

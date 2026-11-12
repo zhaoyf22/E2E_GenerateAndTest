@@ -6,9 +6,19 @@ testforge-python:
     - if [ -f pyproject.toml ]; then pip install -e .; fi
     - pip install pytest pytest-cov
     - if [ -f .testforge/cases/test-cases.json ]; then python testforge/testforge.py validate --cases .testforge/cases/test-cases.json; fi
-    - pytest -q --cov=src --cov-branch --cov-report=json:coverage.json
+    - |
+      if [ -f .testforge/run-manifest.json ]; then
+        python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures --with-reports
+      else
+        pytest -q --cov=src --cov-branch --cov-report=json:coverage.json
+        mkdir -p .testforge/runs
+        printf '{"suites":[],"summary":{"by_stack":{}}}' > .testforge/runs/run-results.json
+      fi
+    - python testforge/testforge.py gate --results .testforge/runs/run-results.json --out .testforge/reports/gate-report.json
   artifacts:
     when: always
     paths:
       - coverage.json
+      - mutants/
       - .testforge/reports/
+      - .testforge/runs/

@@ -1,10 +1,14 @@
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from core.packs import Pack
 from core.scaffold import scaffold_cases
+
+SUITE = Path(__file__).resolve().parents[1]
 
 
 class ScaffoldTest(unittest.TestCase):
@@ -56,6 +60,30 @@ class ScaffoldTest(unittest.TestCase):
             manifest = scaffold_cases([case], pack, "api", out, force=True)
             self.assertEqual(len(manifest["written"]), 1)
             self.assertNotEqual(target.read_text(encoding="utf-8"), "old")
+
+    def test_cli_writes_manifest_under_testforge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proc = subprocess.run(
+                [sys.executable, str(SUITE / "testforge.py"), "init",
+                 "--profile", "python-service", "--target", str(root)],
+                cwd=str(SUITE), capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            cases = root / "cases.json"
+            cases.write_text(json.dumps({"test_cases": [{
+                "id": "TC-1", "title": "first", "stack_id": "api", "type": "functional",
+                "steps": [{"action": "do", "expected": "ok"}], "expected_result": "ok",
+            }]}), encoding="utf-8")
+            proc = subprocess.run(
+                [sys.executable, str(SUITE / "testforge.py"), "scaffold",
+                 "--config", str(root / "testforge.config.json"),
+                 "--cases", str(cases), "--stack", "api", "--out", "generated"],
+                cwd=str(root), capture_output=True, text=True, encoding="utf-8",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertTrue((root / ".testforge" / "scaffold-manifest.json").is_file())
+            self.assertFalse((root / "generated" / "scaffold-manifest.json").exists())
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ Minimal Maven + JUnit 5 service example.
 cd examples/java-service
 mvn -q test
 cd ../..
-python testforge/testforge.py validate --cases examples/java-service/test-cases.sample.json --requirements examples/java-service/requirements.json
+python testforge.py validate --cases examples/java-service/test-cases.sample.json --requirements examples/java-service/requirements.json
 ```
 
 Requires JDK 17+ and Maven. For Testcontainers/WireMock/Pact examples, add the corresponding dependencies and use the pack templates.

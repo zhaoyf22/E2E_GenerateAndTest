@@ -24,7 +24,7 @@
 - `mutation.parser` 支持 `json|pit-xml|stryker-json|mutmut|none`。
 - `parser: "none"` → `not_applicable`，不失败。
 - parser 存在但报告缺失 → 默认 **fail**；加 `--allow-missing-reports` 降级为 warning。
-- `gate-report.json` 的 `stacks` 字段包含每个 stack 的 suite 汇总。
+- `gate-report.json` 的 `stacks` 字段是每个 stack 的门禁结果（`line_coverage`、`mutation_score`、`not_applicable`、`passed`）；每个 stack 的 suite 汇总在 `suite_summary`。
 
 ## flaky 检测
 

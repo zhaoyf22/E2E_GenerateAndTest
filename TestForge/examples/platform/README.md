@@ -22,20 +22,20 @@ cd examples/platform
 copy testforge.config.example.json testforge.config.json
 
 # 2) 打包上下文
-python testforge/testforge.py pack
+python ../../testforge.py pack
 
 # 4) 校验可测项与用例
-python testforge/testforge.py validate --cases testable-items.sample.json --kind testable
-python testforge/testforge.py validate --cases test-cases.sample.json --requirements requirements.json --out .testforge/reports/validation-report.json
+python ../../testforge.py validate --cases testable-items.sample.json --kind testable
+python ../../testforge.py validate --cases test-cases.sample.json --requirements requirements.json --out .testforge/reports/validation-report.json
 
 # 5) 生成覆盖矩阵
-python testforge/testforge.py matrix --cases test-cases.sample.json --requirements requirements.json --out .testforge/cases/coverage-matrix.json
+python ../../testforge.py matrix --cases test-cases.sample.json --requirements requirements.json --out .testforge/cases/coverage-matrix.json
 
 # 6) 导出
-python testforge/testforge.py export --cases test-cases.sample.json --format markdown
+python ../../testforge.py export --cases test-cases.sample.json --format markdown
 
 # 7) dry-run 运行清单
-python testforge/testforge.py run --manifest run-manifest.sample.json --dry-run
+python ../../testforge.py run --manifest run-manifest.sample.json --dry-run
 ```
 
 ## 注意

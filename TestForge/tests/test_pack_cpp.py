@@ -12,6 +12,8 @@ class CppPackTest(unittest.TestCase):
         self.assertTrue(pack.commands["unit"].startswith("ctest"))
         self.assertEqual(pack.coverage["parser"], "lcov")
         self.assertEqual(pack.mutation["tool"], "mull")
+        self.assertIn("--reporters", pack.commands["mutation"])
+        self.assertIn("build/mull-report/mutation.json", pack.mutation["report"])
         template_ids = {item["id"] for item in pack.templates}
         self.assertTrue({"gtest", "catch2", "cmake", "mull", "fuzztest", "rapidcheck", "approvaltests", "cli11"}.issubset(template_ids))
         for item in pack.templates:

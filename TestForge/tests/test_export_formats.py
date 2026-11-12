@@ -1,9 +1,14 @@
 import csv
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from core.export_formats import TESTRAIL_HEADER, XRAY_HEADER, export_testrail_csv, export_xray_csv
+
+SUITE = Path(__file__).resolve().parents[1]
 
 
 CASES = [
@@ -43,6 +48,24 @@ class ExportFormatsTest(unittest.TestCase):
             self.assertEqual(rows[0], XRAY_HEADER)
             self.assertEqual(rows[1][0], "TC-1")
             self.assertEqual(rows[1][7], "AC-1")
+
+    def test_directory_output_uses_distinct_testrail_and_xray_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cases = root / "cases.json"
+            cases.write_text(json.dumps({"test_cases": CASES}), encoding="utf-8")
+            out = root / "exports"
+            out.mkdir()
+            for fmt in ("testrail", "xray"):
+                proc = subprocess.run(
+                    [sys.executable, str(SUITE / "testforge.py"), "export",
+                     "--cases", str(cases), "--format", fmt, "--out", str(out)],
+                    cwd=str(SUITE), capture_output=True, text=True, encoding="utf-8",
+                )
+                self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertTrue((out / "testrail.csv").is_file())
+            self.assertTrue((out / "xray.csv").is_file())
+            self.assertFalse((out / "test-cases.csv").is_file())
 
 
 if __name__ == "__main__":

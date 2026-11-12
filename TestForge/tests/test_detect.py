@@ -3,7 +3,9 @@ import unittest
 from pathlib import Path
 
 from core.detect import detect_stacks
-from core.packs import Pack
+from core.packs import Pack, load_packs
+
+PACKS = Path(__file__).resolve().parents[1] / "packs"
 
 
 def fake_pack(pack_id, files, globs=None):
@@ -49,6 +51,15 @@ class DetectTest(unittest.TestCase):
             packs = {"frontend-web": fake_pack("frontend-web", ["package.json"], ["src/**/*.tsx"])}
             stacks = detect_stacks(root, packs)
             self.assertEqual([(s.pack, s.root) for s in stacks], [("frontend-web", "frontend")])
+
+    def test_k8s_globs_do_not_match_arbitrary_yaml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "pyproject.toml").write_text("", encoding="utf-8")
+            (root / "settings.yaml").write_text("debug: true\n", encoding="utf-8")
+            stacks = detect_stacks(root, load_packs(PACKS))
+            self.assertEqual([s.pack for s in stacks if s.pack == "k8s"], [])
+            self.assertIn("python-service", {s.pack for s in stacks})
 
 
 if __name__ == "__main__":

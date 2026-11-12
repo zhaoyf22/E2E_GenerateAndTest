@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from .config import slugify
 from .packs import Pack
@@ -59,6 +59,7 @@ def scaffold_cases(
     stack_id: str,
     out_dir: Path,
     force: bool = False,
+    manifest_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -107,7 +108,9 @@ def scaffold_cases(
         "written": written,
         "skipped": skipped,
     }
-    (out_dir / "scaffold-manifest.json").write_text(
+    destination = Path(manifest_path) if manifest_path else out_dir / "scaffold-manifest.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return manifest

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from core.packs import get_pack, load_pack, load_packs, validate_pack
 
+PACKS = Path(__file__).resolve().parents[1] / "packs"
+
 
 class PackTest(unittest.TestCase):
     def test_load_pack_reads_contract(self):
@@ -41,6 +43,17 @@ class PackTest(unittest.TestCase):
         errors = validate_pack({"id": "x", "commands": [], "inputs": []})
         self.assertTrue(any("commands" in e for e in errors))
         self.assertTrue(any("inputs" in e for e in errors))
+
+    def test_shipped_pack_references_resolve(self):
+        packs = load_packs(PACKS)
+        self.assertEqual(len(packs), 5)
+        for pack in packs.values():
+            for template in pack.templates:
+                self.assertTrue((pack.path / template["path"]).is_file(), f"{pack.id}: {template['path']}")
+            for relative in pack.partials + pack.adapters + pack.ci:
+                self.assertTrue((pack.path / relative).is_file(), f"{pack.id}: {relative}")
+            if pack.acceptance:
+                self.assertTrue((pack.path / pack.acceptance).is_file(), f"{pack.id}: {pack.acceptance}")
 
 
 if __name__ == "__main__":

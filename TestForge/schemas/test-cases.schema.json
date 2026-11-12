@@ -23,6 +23,8 @@
           "title": { "type": "string", "minLength": 4 },
           "ac_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
           "ti_ids": { "type": "array", "items": { "type": "string" } },
+          "stack_id": { "type": "string", "description": "Stack that owns this case" },
+          "pack": { "type": "string", "description": "Scenario pack that owns this case" },
           "source_refs": { "type": "array", "minItems": 1, "items": { "type": "string" } },
           "technique": {
             "type": "string",

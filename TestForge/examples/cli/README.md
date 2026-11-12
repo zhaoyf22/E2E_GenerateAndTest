@@ -15,9 +15,9 @@
 python testforge.py init --target examples/cli --profile cli --force
 cd examples/cli
 
-python testforge/testforge.py pack
-python testforge/testforge.py validate --cases test-cases.sample.json --requirements requirements.json
-python testforge/testforge.py export --cases test-cases.sample.json --format markdown
+python ../../testforge.py pack
+python ../../testforge.py validate --cases test-cases.sample.json --requirements requirements.json
+python ../../testforge.py export --cases test-cases.sample.json --format markdown
 ```
 
 ## CLI 测试要点

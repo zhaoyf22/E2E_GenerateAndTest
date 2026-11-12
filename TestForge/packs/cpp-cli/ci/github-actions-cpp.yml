@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,22 +16,49 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Install coverage tools
+        run: sudo apt-get update && sudo apt-get install -y lcov
+      - name: Configure (coverage build)
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage
       - name: Build
         run: cmake --build build -j
       - name: Test
         run: ctest --test-dir build --output-on-failure
+      - name: Coverage (lcov)
+        run: |
+          lcov --capture --directory build --output-file build/coverage.info --ignore-errors mismatch
+          lcov --remove build/coverage.info '/usr/*' --output-file build/coverage.info --ignore-errors unused
+      - name: Mutation (Mull)
+        run: mull-runner build/tests --reporters Elements --report-dir build/mull-report --report-name mutation
       - name: Validate cases
         run: |
           if [ -f .testforge/cases/test-cases.json ]; then
             python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
           fi
+      - name: Run manifest (record results)
+        run: |
+          if [ -f .testforge/run-manifest.json ]; then
+            python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+          else
+            echo "No .testforge/run-manifest.json; run testforge.py init first"
+            exit 1
+          fi
+      - name: Quality gate
+        run: |
+          python testforge/testforge.py gate \
+            --results .testforge/runs/run-results.json \
+            --out .testforge/reports/gate-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: testforge-cpp
           path: |
             build/Testing/
+            build/coverage.info
+            build/mull-report/
             .testforge/reports/
+            .testforge/runs/
           if-no-files-found: ignore

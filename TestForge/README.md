@@ -32,12 +32,14 @@ TestForge 现在是 **通用内核 + 可组合场景包（packs）**：
 python testforge.py init --list-packs
 python testforge.py init --stack python-service --target . --dry-run
 python testforge.py init --detect --target . --dry-run
-python testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack web --out e2e/generated
+python testforge.py scaffold --cases .testforge/cases/e2e-cases.json --stack api --out e2e/generated
 python testforge.py export --cases .testforge/cases/test-cases.json --format testrail
 python testforge.py export --cases .testforge/cases/test-cases.json --format xray
 python testforge.py prompt --stack api --stage 02-test-design
 python testforge.py mcp --allow-write
 ```
+
+MCP 默认只读：`run`/`scaffold`/`export`/`prompt --out` 需要 `--allow-write` 或 `TESTFORGE_MCP_ALLOW_WRITE=1`。`pack`/`validate`/`gate`/`report` 归类为只读工具（不修改源码/测试文件），但仍会写 `context.json`、validation/gate/report 等运行产物；只读不等于“无文件写入”。
 
 旧的 `--profile platform/service/cli/frontend/backend` 仍然可用，会自动映射到 pack 组合或单 stack。
 
@@ -74,7 +76,7 @@ TestForge/
 ├── templates/                   # 通用模板
 ├── adapters/                    # 通用适配器说明
 ├── ci/                          # 通用 CI；各 pack 也有自己的 ci/
-├── tests/                       # unittest 测试（37 个）
+├── tests/                       # unittest 测试（含 stack / gate / report 回归）
 ├── examples/                    # platform / python-service / java-service / cpp-cli
 └── docs/                        # 架构、工作流、质量门禁、安全、审查记录
 ```
@@ -151,10 +153,11 @@ python testforge.py init --profile web
 
 ```bash
 python testforge.py init --stack python-service:services/api --stack java-service:services/order --surface k8s
+python testforge.py init --stack python-service:services/api --stack java-service:services/order --stack-id api --stack-id svc
 python testforge.py init --detect --target .
 ```
 
-旧 profile `service/cli/frontend/backend` 仍可用，会按检测或固定顺序回退到单 stack；旧配置无 `stacks` 时会合成 `default` stack。
+旧 profile `service/cli/frontend/backend` 仍可用：`service`/`backend` 会检测 Python/Java（无法判定时回退 Python），`cli` 检测 CMake（否则回退 Python），`frontend` 映射到 `frontend-web`；旧配置无 `stacks` 时会合成 `default` stack。
 
 ---
 
@@ -222,6 +225,8 @@ docs/api/code ──pack──▶ context.json + context.md
 - PDF/Word 解析质量取决于 Docling/MinerU；复杂合并单元格仍需人工校验。
 - 生成的测试必须经过执行与人工评审；`gate` 只能证明“达到阈值”，不能证明“业务正确”。
 - 许可证：本套件 MIT；推荐工具各自的许可证请逐项确认（尤其 AGPL、PolyForm Noncommercial、fair-source）。
+- Java scaffold 模板固定使用 `com.example` 包名；TestForge 不推断 Java package，生成后需按项目调整 `package` 行和目录。
+- `gate` 对显式 stack 按 pack 默认要求覆盖率/变异报告（缺失默认失败）；旧配置无 `stacks` 且未声明报告时跳过对应检查。用 `--allow-missing-reports` 可显式降级。
 
 ---
 

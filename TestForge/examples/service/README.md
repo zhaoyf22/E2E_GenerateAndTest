@@ -16,10 +16,10 @@
 python testforge.py init --target examples/service --profile service --force
 cd examples/service
 
-python testforge/testforge.py pack
-python testforge/testforge.py validate --cases test-cases.sample.json --requirements requirements.json
-python testforge/testforge.py matrix --cases test-cases.sample.json --requirements requirements.json
-python testforge/testforge.py export --cases test-cases.sample.json --format gherkin
+python ../../testforge.py pack
+python ../../testforge.py validate --cases test-cases.sample.json --requirements requirements.json
+python ../../testforge.py matrix --cases test-cases.sample.json --requirements requirements.json
+python ../../testforge.py export --cases test-cases.sample.json --format gherkin
 ```
 
 ## 下一步

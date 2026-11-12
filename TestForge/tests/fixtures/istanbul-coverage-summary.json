@@ -1,0 +1,6 @@
+{
+  "total": {
+    "lines": { "total": 100, "covered": 80, "skipped": 0, "pct": 80 },
+    "statements": { "total": 100, "covered": 70, "skipped": 0, "pct": 70 }
+  }
+}

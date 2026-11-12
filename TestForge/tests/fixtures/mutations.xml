@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mutations partial="false">
+  <mutation detected="true" status="KILLED" numberOfTestsRun="3">
+    <sourceFile>OrderService.java</sourceFile>
+    <mutatedClass>com.example.OrderService</mutatedClass>
+    <mutatedMethod>add</mutatedMethod>
+    <lineNumber>10</lineNumber>
+    <mutator>MathMutator</mutator>
+    <index>1</index>
+  </mutation>
+  <mutation detected="false" status="SURVIVED" numberOfTestsRun="3">
+    <sourceFile>OrderService.java</sourceFile>
+    <mutatedClass>com.example.OrderService</mutatedClass>
+    <mutatedMethod>add</mutatedMethod>
+    <lineNumber>10</lineNumber>
+    <mutator>ConditionalsBoundaryMutator</mutator>
+    <index>2</index>
+  </mutation>
+  <mutation detected="true" status="KILLED" numberOfTestsRun="3">
+    <sourceFile>OrderService.java</sourceFile>
+    <mutatedClass>com.example.OrderService</mutatedClass>
+    <mutatedMethod>add</mutatedMethod>
+    <lineNumber>11</lineNumber>
+    <mutator>MathMutator</mutator>
+    <index>3</index>
+  </mutation>
+  <mutation detected="false" status="SURVIVED" numberOfTestsRun="3">
+    <sourceFile>OrderService.java</sourceFile>
+    <mutatedClass>com.example.OrderService</mutatedClass>
+    <mutatedMethod>add</mutatedMethod>
+    <lineNumber>11</lineNumber>
+    <mutator>NegateConditionalsMutator</mutator>
+    <index>4</index>
+  </mutation>
+</mutations>

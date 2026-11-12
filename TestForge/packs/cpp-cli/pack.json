@@ -26,10 +26,10 @@
     "build": "cmake --build build -j",
     "unit": "ctest --test-dir build --output-on-failure",
     "coverage": "cmake --build build --target coverage",
-    "mutation": "mull-runner"
+    "mutation": "mull-runner build/tests --reporters Elements --report-dir build/mull-report --report-name mutation"
   },
   "coverage": { "parser": "lcov", "report": "build/coverage.info" },
-  "mutation": { "tool": "mull", "parser": "json", "report": "mull-report.json", "score_key": "mutation_score" },
+  "mutation": { "tool": "mull", "parser": "json", "report": "build/mull-report/mutation.json", "score_key": "mutation_score" },
   "templates": [
     { "id": "gtest", "path": "templates/gtest_test.cpp", "target": "tests/generated/${module}_test.cpp" },
     { "id": "catch2", "path": "templates/catch2_test.cpp", "target": "tests/generated/${module}_catch2_test.cpp" },

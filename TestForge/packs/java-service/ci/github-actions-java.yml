@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,15 +18,31 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Test + JaCoCo
         run: mvn -q test jacoco:report
+      - name: PIT mutation report
+        run: mvn -q org.pitest:pitest-maven:mutationCoverage
       - name: Validate cases
         run: |
           if [ -f .testforge/cases/test-cases.json ]; then
             python testforge/testforge.py validate --cases .testforge/cases/test-cases.json
           fi
-      - name: PIT (optional)
-        run: mvn -q org.pitest:pitest-maven:mutationCoverage || true
+      - name: Run manifest (record results)
+        run: |
+          if [ -f .testforge/run-manifest.json ]; then
+            python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+          else
+            echo "No .testforge/run-manifest.json; run testforge.py init first"
+            exit 1
+          fi
+      - name: Quality gate
+        run: |
+          python testforge/testforge.py gate \
+            --results .testforge/runs/run-results.json \
+            --out .testforge/reports/gate-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -32,4 +51,5 @@ jobs:
             target/site/jacoco/
             target/pit-reports/
             .testforge/reports/
+            .testforge/runs/
           if-no-files-found: ignore

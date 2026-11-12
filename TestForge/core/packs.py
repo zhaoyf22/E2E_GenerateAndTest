@@ -82,6 +82,9 @@ def load_pack(pack_dir: Path) -> Pack:
     pack_id = str(data.get("id") or "").strip()
     if not pack_id:
         raise ValueError(f"pack.json is missing id: {manifest_path}")
+    errors = validate_pack(data)
+    if errors:
+        raise ValueError(f"invalid pack.json {manifest_path}: {'; '.join(errors)}")
     return Pack(id=pack_id, path=Path(pack_dir), manifest=data)
 
 

@@ -21,6 +21,36 @@
         "properties": {
           "name": { "type": "string" },
           "command": { "type": "string" },
+          "stack_id": { "type": "string", "description": "Owning stack id" },
+          "pack": { "type": "string", "description": "Owning scenario pack" },
+          "kind": { "type": "string", "enum": ["test", "report"], "default": "test" },
+          "run_after": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Suite names that must pass before this report suite runs"
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "parser": {
+                "type": "string",
+                "enum": ["coverage.py", "jacoco", "lcov", "cobertura", "istanbul", "gcovr", "none"]
+              },
+              "report": { "type": "string" }
+            }
+          },
+          "mutation": {
+            "type": "object",
+            "properties": {
+              "tool": { "type": "string" },
+              "parser": {
+                "type": "string",
+                "enum": ["json", "pit-xml", "stryker-json", "mutmut", "none"]
+              },
+              "report": { "type": "string" },
+              "score_key": { "type": "string" }
+            }
+          },
           "cwd": { "type": "string", "default": "." },
           "timeout": { "type": "integer", "default": 1800 },
           "reruns": { "type": "integer", "minimum": 1, "default": 1, "description": "Run the suite N times to detect flakiness." },

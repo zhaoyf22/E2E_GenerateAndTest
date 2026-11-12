@@ -12,6 +12,9 @@ class PythonPackTest(unittest.TestCase):
         self.assertEqual(pack.id, "python-service")
         self.assertEqual(pack.commands["unit"], "pytest -q")
         self.assertEqual(pack.coverage["parser"], "coverage.py")
+        self.assertIn("mutmut export-cicd-stats", pack.commands["mutation"])
+        self.assertEqual(pack.mutation["parser"], "mutmut")
+        self.assertEqual(pack.mutation["report"], "mutants/mutmut-cicd-stats.json")
         self.assertEqual(pack.scaffold["default_template"], "pytest")
         template_ids = {item["id"] for item in pack.templates}
         self.assertTrue({"pytest", "conftest", "testcontainers", "schemathesis", "hypothesis"}.issubset(template_ids))

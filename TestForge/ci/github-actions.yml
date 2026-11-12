@@ -50,39 +50,38 @@ jobs:
       - name: Unit / API tests
         run: |
           if [ -f pytest.ini ] || [ -f pyproject.toml ] || [ -d tests ]; then
-            pytest -q --cov=src --cov-report=json:coverage.json || true
+            pytest -q --cov=src --cov-report=json:coverage.json
           fi
 
       - name: Install Node deps
         run: |
           if [ -f package.json ]; then
             npm ci || npm install
-            npx playwright install --with-deps || true
+            npx playwright install --with-deps
           fi
 
       - name: E2E tests
         run: |
           if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
-            npx playwright test || true
+            npx playwright test
           fi
 
-      - name: Run manifest (if present)
+      - name: Run manifest (record results)
         run: |
           if [ -f .testforge/run-manifest.json ]; then
             python testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+          else
+            mkdir -p .testforge/runs
+            printf '{"suites":[],"summary":{"by_stack":{}}}' > .testforge/runs/run-results.json
           fi
 
       - name: Quality gate
         run: |
-          if [ -f .testforge/runs/run-results.json ]; then
-            python testforge/testforge.py gate \
-              --results .testforge/runs/run-results.json \
-              --coverage coverage.json \
-              --validation .testforge/reports/validation-report.json \
-              --out .testforge/reports/gate-report.json
-          else
-            echo "No run results; skipping gate"
-          fi
+          python testforge/testforge.py gate \
+            --results .testforge/runs/run-results.json \
+            --coverage coverage.json \
+            --validation .testforge/reports/validation-report.json \
+            --out .testforge/reports/gate-report.json
 
       - name: Report
         if: always()

@@ -4,7 +4,7 @@
   "version": "0.1.0-stub",
   "detect": {
     "files": ["Chart.yaml", "kustomization.yaml", "chainsaw-test.yaml", "testworkflow.yaml"],
-    "globs": ["**/*.yaml", "**/*.yml"],
+    "globs": ["deploy/**/*.yaml", "deploy/**/*.yml", "manifests/**/*.yaml", "manifests/**/*.yml", "charts/**/*.yaml", "charts/**/*.yml", "**/chainsaw-test.yaml", "**/testworkflow.yaml"],
     "priority": 5
   },
   "inputs": {

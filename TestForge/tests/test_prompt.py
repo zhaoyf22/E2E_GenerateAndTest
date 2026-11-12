@@ -36,6 +36,15 @@ class PromptTest(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 compose_prompt("missing", "api", {}, {}, Path(tmp))
 
+    def test_stage_path_traversal_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prompts = root / "prompts"
+            prompts.mkdir()
+            (root / "secret.md").write_text("# secret\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                compose_prompt("../secret", "api", {}, {}, prompts)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,30 @@
 testforge-cpp:
   image: gcc:14
   script:
-    - apt-get update && apt-get install -y cmake ninja-build lcov
-    - cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - apt-get update && apt-get install -y cmake ninja-build lcov python3
+    - >
+      cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      -DCMAKE_CXX_FLAGS=--coverage -DCMAKE_EXE_LINKER_FLAGS=--coverage
     - cmake --build build -j
     - ctest --test-dir build --output-on-failure
+    - lcov --capture --directory build --output-file build/coverage.info --ignore-errors mismatch
+    - lcov --remove build/coverage.info '/usr/*' --output-file build/coverage.info --ignore-errors unused
+    - mull-runner build/tests --reporters Elements --report-dir build/mull-report --report-name mutation
+    - if [ -f .testforge/cases/test-cases.json ]; then python3 testforge/testforge.py validate --cases .testforge/cases/test-cases.json; fi
+    - |
+      if [ -f .testforge/run-manifest.json ]; then
+        python3 testforge/testforge.py run --manifest .testforge/run-manifest.json --allow-failures
+      else
+        echo "No .testforge/run-manifest.json; run testforge.py init first"
+        exit 1
+      fi
+    - python3 testforge/testforge.py gate --results .testforge/runs/run-results.json --out .testforge/reports/gate-report.json
   artifacts:
     when: always
     paths:
       - build/Testing/
+      - build/coverage.info
+      - build/mull-report/
       - .testforge/reports/
+      - .testforge/runs/

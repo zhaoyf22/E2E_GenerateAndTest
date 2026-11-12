@@ -1,6 +1,15 @@
+import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
-from core.mcp import handle_request
+from core.mcp import handle_request, serve
+
+SUITE = Path(__file__).resolve().parents[1]
 
 
 def fake_cli(args):
@@ -37,6 +46,42 @@ class McpTest(unittest.TestCase):
             "params": {"name": "testforge_run", "arguments": {"manifest": "m.json", "allow_write": True}},
         }, fake_cli)
         self.assertFalse(response["result"]["isError"])
+
+    def test_non_object_json_returns_invalid_request(self):
+        stdout = io.StringIO()
+        serve(fake_cli, stdin=io.StringIO("1\n"), stdout=stdout)
+        response = json.loads(stdout.getvalue().strip())
+        self.assertEqual(response["error"]["code"], -32600)
+
+    def test_non_object_request_direct(self):
+        response = handle_request([1, 2, 3], fake_cli)  # type: ignore[arg-type]
+        self.assertEqual(response["error"]["code"], -32600)
+
+    def test_allow_write_env_var_enables_write_tools(self):
+        request = json.dumps({
+            "jsonrpc": "2.0", "id": 6, "method": "tools/call",
+            "params": {"name": "testforge_scaffold", "arguments": {"cases": "nope.json", "stack": "api"}},
+        }) + "\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            base_env = dict(os.environ)
+            base_env.pop("TESTFORGE_MCP_ALLOW_WRITE", None)
+
+            def call(env):
+                return subprocess.run(
+                    [sys.executable, str(SUITE / "testforge.py"), "mcp"],
+                    input=request, cwd=tmp, env=env, capture_output=True,
+                    text=True, encoding="utf-8", timeout=120,
+                )
+
+            denied = call(base_env)
+            denied_text = json.loads(denied.stdout.strip().splitlines()[0])["result"]["content"][0]["text"]
+            self.assertIn("write permission required", denied_text)
+
+            allowed_env = dict(base_env)
+            allowed_env["TESTFORGE_MCP_ALLOW_WRITE"] = "1"
+            allowed = call(allowed_env)
+            allowed_text = json.loads(allowed.stdout.strip().splitlines()[0])["result"]["content"][0]["text"]
+            self.assertNotIn("write permission required", allowed_text)
 
 
 if __name__ == "__main__":

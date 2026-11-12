@@ -219,6 +219,12 @@ def handle_request(
     run_cli: RunCli,
     allow_write: bool = False,
 ) -> Optional[Dict[str, Any]]:
+    if not isinstance(request, dict):
+        return {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": -32600, "message": "invalid request: expected a JSON object"},
+        }
     request_id = request.get("id")
     if "id" not in request:
         return None

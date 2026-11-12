@@ -48,6 +48,8 @@ python /path/to/TestForge/testforge.py init --target ./your-project --stack java
 python /path/to/TestForge/testforge.py init --target ./your-project --stack cpp-cli
 ```
 
+`--with-ci` 会把所选 stack/pack 的 CI 模板安装到 `.github/workflows/`（GitLab 模板写到 `.gitlab-ci.<pack>.yml`）；pack 模板已包含 `run`（生成 run-results）和阻断式 `gate`，不再用 `|| true` 吞掉门禁失败。
+
 ## 2. 体检
 
 ```bash
@@ -134,9 +136,15 @@ python testforge/testforge.py export \
 ```bash
 python testforge/testforge.py run --manifest .testforge/run-manifest.json --dry-run
 python testforge/testforge.py run --manifest .testforge/run-manifest.json
-python testforge/testforge.py gate --results .testforge/runs/run-results.json --coverage coverage.json
+python testforge/testforge.py run --manifest .testforge/run-manifest.json --with-reports
+python testforge/testforge.py gate --results .testforge/runs/run-results.json
 python testforge/testforge.py report --results .testforge/runs/run-results.json
 ```
+
+- `run` 默认只跑 `kind=test` 套件；`--with-reports` 才会跑 coverage/mutation 报告套件。
+- `gate` 对显式 stack 按 pack 默认解析覆盖率/变异报告，**报告缺失默认失败**；确需容忍时加 `--allow-missing-reports`。
+- 旧配置（无 `stacks`）且未声明覆盖率/变异报告时，`gate` 跳过这两项，不会误报失败。
+- `gate-report.json` 的 `stacks` 是每个 stack 的门禁结果（`line_coverage`、`mutation_score`、`not_applicable`、`passed`）；`report.md` 会输出 `## Stack: <id>` 分节。
 
 ## 9. 用示例练手
 

@@ -16,9 +16,13 @@ def compose_prompt(
     packs: Mapping[str, Pack],
     prompts_dir: Path,
 ) -> str:
-    prompts_dir = Path(prompts_dir)
+    prompts_dir = Path(prompts_dir).resolve()
     stage_name = stage if stage.endswith(".md") else f"{stage}.md"
-    base_path = prompts_dir / stage_name
+    base_path = (prompts_dir / stage_name).resolve()
+    try:
+        base_path.relative_to(prompts_dir)
+    except ValueError:
+        raise ValueError(f"prompt stage escapes prompts directory: {stage}")
     if not base_path.is_file():
         raise FileNotFoundError(f"prompt not found: {base_path}")
     stacks = normalize_stacks(config, packs)
