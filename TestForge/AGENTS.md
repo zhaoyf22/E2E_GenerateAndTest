@@ -4,10 +4,11 @@
 
 ## 先读
 
-1. `README.md`：能力与结构。
-2. `QUICKSTART.md`：5 分钟跑通。
-3. `testforge.config.json`：项目路径、技术栈、命令、门禁。
-4. `prompts/00-system.md`：所有阶段的通用规则。
+1. `docs/USAGE.md`：完整使用说明（先用第 0 节最小路径）。
+2. `README.md`：能力与结构。
+3. `QUICKSTART.md`：5 分钟跑通。
+4. `testforge.config.json`：项目路径、技术栈、命令、门禁。
+5. `prompts/00-system.md`：所有阶段的通用规则。
 
 ## 工作流
 

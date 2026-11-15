@@ -4,6 +4,8 @@
 >
 > 适用：平台级项目（前端 + 后端）、单个服务、单个客户端工具、库/SDK。  
 > 宿主：Claude Code、Codex、Cursor、Gemini CLI 等支持 Agent Skills / Subagents 的编码 Agent；也可以只用其中的 Python CLI 与提示词。
+>
+> **第一次使用请先读 [`docs/USAGE.md`](docs/USAGE.md)**：第 0 节是三步最小路径，后面是全量说明。
 
 ---
 
@@ -232,7 +234,8 @@ docs/api/code ──pack──▶ context.json + context.md
 
 ## 9. 快速开始
 
-见 `QUICKSTART.md`（5 分钟跑通一个示例）。
+- `docs/USAGE.md`：**完整使用说明**（最小路径 + 全量命令/配置/依赖/场景/排错）。
+- `QUICKSTART.md`：5 分钟跑通一个示例。
 
 ## 10. 不依赖真实服务的自检
 
